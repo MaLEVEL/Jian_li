@@ -1,0 +1,9 @@
+Zhang Wei
+Backend Developer
+
+Skills: Python, FastAPI, React, TypeScript, SQLite, PostgreSQL, REST API, pytest.
+
+Projects:
+- Built a FastAPI service with SQLite persistence, file upload, and automated API tests.
+- Created a React + TypeScript dashboard for tracking job applications and analysis results.
+- Improved API reliability by adding request validation, error handling, and integration tests.
