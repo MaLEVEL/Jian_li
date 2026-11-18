@@ -22,6 +22,11 @@ frontend/vite.config.d.ts
 # Environment files
 .env
 .env.*
+!.env.example
+data/
+.ruff_cache/
+.superpowers/
+*.egg-info/
 
 # OS / editor
 .DS_Store

@@ -1,0 +1,221 @@
+与
+ChatGLM
+的对话
+用户
+我不要理论和方向，我要具体的项目
+ChatGLM
+思考结束
+
+好，直接给你一个完整可执行的项目。你不用再做选择题了。
+
+项目：JD-Resume 智能匹配 Agent（求职加速器）
+为什么是它（30 秒说完，不再讲理论）
+你自己就是真实用户，每天投简历就有真实数据和真实痛点，面试时讲起来有血有肉
+一个项目同时覆盖 JD 高频词：RAG + Function Calling + Agent 工作流 + FastAPI + 向量数据库 + 部署，Python 岗和 Agent 岗都能投
+数据来源合法（你自己收集的 JD 文本），不需要爬虫对抗、不需要付费数据
+功能定义（就做这 5 个，不多做）
+JD 解析：粘贴一段招聘 JD 文本 → 自动抽取技能要求、经验要求、业务领域，结构化输出 JSON
+简历解析：上传 PDF/粘贴文本 → 抽取项目经历、技能栈，结构化
+匹配打分：对比两者 → 输出匹配度分数 + 缺失技能清单 + 逐条分析理由（不是拍脑袋打分，是可解释的）
+改进建议：针对缺失技能，从你的简历项目库（你自己维护一个“经历素材库”）里检索可挖掘的素材，生成改写建议
+批量投递助手：导入 20 条 JD → 批量打分排序 → 生成每条 JD 的定制化简历版本建议
+技术栈（全部免费，照抄即可）
+模块	具体选型
+语言	Python 3.11
+Agent 编排	LangGraph（不是 LangChain 链式，用状态图）
+LLM	DeepSeek API（免费额度够你开发全程，便宜到忽略不计）
+Embedding	BAAI/bge-small-zh-v1.5（本地跑，不花一分钱）
+向量库	ChromaDB（本地持久化，单机够用）
+重排序	bge-reranker-base（本地）
+后端	FastAPI + Uvicorn
+前端	Gradio（别碰 Vue/React，浪费时间）
+部署	一台 9.9 元/月的轻量云服务器（腾讯云/阿里云新用户）或 HuggingFace Spaces
+版本管理	Git + GitHub，密钥用 .env + python-dotenv
+项目结构（直接照建）
+
+复制
+jd-resume-agent/
+├── app/
+│   ├── main.py              # FastAPI 入口
+│   ├── graph.py             # LangGraph 状态图（核心）
+│   ├── nodes/
+│   │   ├── jd_parser.py     # JD 解析节点
+│   │   ├── resume_parser.py # 简历解析节点
+│   │   ├── matcher.py       # 匹配打分节点
+│   │   ├── advisor.py       # 建议生成节点
+│   │   └── router.py        # 意图路由节点
+│   ├── rag/
+│   │   ├── ingest.py        # 素材库入库
+│   │   ├── retriever.py     # 混合检索（BM25+向量+RRF）
+│   │   └── chunker.py       # 切分逻辑
+│   ├── tools/
+│   │   ├── skill_kb.py      # 技能同义词库工具
+│   │   └── score_calc.py    # 加权评分工具
+│   ├── prompts/             # 每个节点单独的 .txt prompt 文件
+│   ├── eval/
+│   │   ├── testset.json     # 30 条标注好的测试数据
+│   │   └── run_eval.py      # 评估脚本
+│   └── config.py
+├── data/
+│   ├── materials/           # 你的经历素材库（markdown）
+│   └── chroma/              # 向量库持久化
+├── .env                     # DEEPSEEK_API_KEY=xxx（gitignore 掉）
+├── requirements.txt
+├── Dockerfile
+└── README.md
+
+核心代码骨架（拿来就能改）
+
+LangGraph 状态图（app/graph.py）——这是整个项目的心脏：
+
+python
+
+复制
+from langgraph.graph import StateGraph, END
+from typing import TypedDict, Literal
+
+class AgentState(TypedDict):
+    jd_text: str
+    resume_text: str
+    jd_structured: dict      # 解析后的JD
+    resume_structured: dict  # 解析后的简历
+    match_score: float
+    missing_skills: list
+    advice: str
+    intent: Literal["single", "batch", "advice_only"]
+
+def build_graph():
+    g = StateGraph(AgentState)
+    g.add_node("router",      route_intent)
+    g.add_node("parse_jd",    parse_jd)          # 调LLM，输出JSON
+    g.add_node("parse_resume", parse_resume)
+    g.add_node("match",       calculate_match)   # 调skill_kb工具对齐技能词
+    g.add_node("advise",      generate_advice)   # RAG检索素材库+生成建议
+    g.add_node("batch",       batch_scoring)
+
+    g.set_entry_point("router")
+    g.add_conditional_edges("router", lambda s: s["intent"], {
+        "single": "parse_jd",
+        "batch":  "batch",
+        "advice_only": "advise",
+    })
+    g.add_edge("parse_jd", "parse_resume")
+    g.add_edge("parse_resume", "match")
+    g.add_edge("match", "advise")
+    g.add_edge("advise", END)
+    g.add_edge("batch", END)
+    return g.compile()
+
+
+匹配节点里做“可解释打分”（这是你和 Demo 玩家的分水岭）：
+
+python
+
+复制
+# tools/skill_calc.py
+SKILL_WEIGHTS = {"must_have": 3.0, "nice_have": 1.0}
+
+def calculate_match(jd_skills: list, resume_skills: list) -> dict:
+    # 先用同义词库对齐（"LangChain" ≈ "LangGraph"、"sklearn" ≈ "scikit-learn"）
+    aligned_resume = expand_synonyms(resume_skills)
+    matched, missing = [], []
+    for skill, weight in jd_skills:
+        (matched if skill in aligned_resume else missing).append((skill, weight))
+    score = sum(w for _, w in matched) / sum(w for _, w in jd_skills) * 100
+    return {"score": round(score, 1),
+            "matched": matched, "missing": missing,
+            "explain": f"命中{len(matched)}/{len(jd_skills)}项必会技能"}
+
+
+RAG 检索链路（app/rag/retriever.py）——三层结构，面试就靠它拿分：
+
+python
+
+复制
+from rank_bm25 import BM25Okapi
+import jieba
+
+class HybridRetriever:
+    def __init__(self, vectorstore):
+        self.vs = vectorstore
+
+    def search(self, query: str, top_k: int = 10):
+        # 1. BM25 关键词召回
+        bm25_hits = self.bm25.get_scores(jieba.lcut(query))
+        # 2. 向量语义召回
+        vec_hits = self.vs.similarity_search_with_score(query, k=10)
+        # 3. RRF 融合 + Rerank 截断到最终 top_k
+        fused = rrf_fuse(bm25_hits, vec_hits)
+        return self.reranker.rerank(query, fused)[:top_k]
+
+4 周开发排期（每天 2–3 小时）
+
+第 1 周：跑通主链路（丑没关系，能跑就行）
+
+Day 1–2：环境搭建，DeepSeek API 打通，写 parse_jd 的 prompt，让 JD 文本能稳定输出 JSON
+Day 3–4：parse_resume + calculate_match，先用你自己真实的简历测
+Day 5：Gradio 页面：两个输入框（JD、简历）+ 一个按钮 + 结果展示
+Day 6–7：接 LangGraph 重构成状态图，Git 提交
+
+第 2 周：加深度（这周决定项目档次）
+
+Day 8–9：建“素材库”——把你大学做过的所有事（课设、比赛、实习、帮老师干活）写成 30–50 条 markdown 素材，入库 ChromaDB
+Day 10–11：实现混合检索（BM25 + 向量 + RRF），对比纯向量检索的召回差异，记录数字
+Day 12–13：加技能同义词库，处理“简历写 sklearn、JD 要 scikit-learn”这类问题，记录命中率提升
+Day 14：加 advisor 节点：根据 missing_skills 检索素材库，生成“你可以把 XX 经历这样改写”的建议
+
+第 3 周：工程化 + 评估（应届生最稀缺的部分）
+
+Day 15–16：FastAPI 改造，接口化，加请求日志、异常兜底（LLM 输出 JSON 解析失败自动重试）
+Day 17–18：构建 30 条测试集（15 条匹配的 + 15 条不匹配的 JD-简历对，人工标注预期分数区间）
+Day 19：写 run_eval.py：跑测试集，输出打分准确率、检索命中率报告
+Day 20–21：批量模式：导入 20 条真实 JD，一键排序 + 导出 CSV
+
+第 4 周：部署 + 包装
+
+Day 22–23：Docker 打包，部署到轻量服务器或 HF Spaces
+Day 24–25：写 README：架构图（用 draw.io 画）、技术选型理由表、优化前后对比数据
+Day 26–27：自己真实使用一周，收集自己的使用反馈，迭代一轮（这是面试最好讲的部分：“我自己是第一个用户，用了 X 天发现 Y 问题，改了 Z”）
+Day 28：整理简历话术 + 模拟面试自问自答
+评估指标（必须做，这些数字就是你的简历）
+
+跑完测试集后你会有这样的数据：
+
+匹配打分与人工标注的一致率：目标 ≥ 80%
+混合检索 vs 纯向量检索的召回率对比（例如：68% → 85%）
+同义词对齐后技能命中率提升（例如：61% → 90%）
+单次分析耗时和 Token 成本（例如：平均 3.2s / 0.004 元）
+简历上最终怎么写（直接抄）
+
+JD-Resume 智能匹配 Agent（个人项目 · Python · LangGraph · ChromaDB · FastAPI · Gradio）
+
+基于 LangGraph 状态图构建多节点 Agent 工作流（意图路由→JD/简历结构化解析→加权匹配→RAG建议生成），单次分析耗时 < 4s
+设计 BM25 + 向量双路召回 + RRF 融合 + bge-reranker 重排的三层检索链路，素材召回率从 68% 提升至 85%
+构建技能同义词对齐层，解决技能表述不一致问题，技能命中率从 61% 提升至 90%
+构建 30 条人工标注测试集做回归评估，打分结果与人工标注一致率 82%；FastAPI 服务化 + Docker 部署，含 JSON 解析失败自动重试等异常兜底
+今晚就能开始的第一步
+注册 DeepSeek 开放平台，充 10 块钱（能用很久），拿到 API Key
+pip install langgraph langchain openai chromadb rank_bm25 jieba gradio fastapi
+新建项目文件夹，git init，把上面的目录结构建出来
+写第一个 prompt 让 LLM 解析一段你今天看到的真实 JD，要求输出固定 JSON 格式——这一步通了，项目就成了 30%
+
+4 周后你手里就是一个有真实用户（你自己）、有量化指标、有工程化、有部署的项目，投“Python 开发”和“Agent 开发”岗都能讲 20 分钟。现在打开终端开始吧，卡在任何一步随时回来问我具体代码。
+
+和Ta继续聊
+开启新对话
+内容由AI生成，请仔细甄别
+   
+2026 ChatGLM5 京公网安备11010802041394号
+ 
+京ICP备20011824号-18
+ 
+用户协议
+ 
+|
+ 
+隐私政策
+ 
+|
+ 
+开源模型
+ 
