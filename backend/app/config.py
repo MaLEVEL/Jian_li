@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     llm_mode: Literal['auto', 'offline', 'online'] = 'auto'
     timeout_seconds: float = Field(default=30, ge=1, le=120)
     max_retries: int = Field(default=2, ge=0, le=3)
+    reasoning_effort: Literal['', 'low', 'high', 'max'] = ''
     data_dir: Path = ROOT / 'data'
     rag_mode: Literal['local', 'bge'] = 'local'
     batch_concurrency: int = Field(default=2, ge=1, le=4)

@@ -13,10 +13,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from pypdf import PdfReader
 
+from .business_skills import get_skill, list_skills, run_skill
 from .config import ROOT, Settings
 from .graph import run_analysis
 from .rag import MaterialRetriever
-from .schemas import AnalyzeRequest, BatchRequest, MaterialInput
+from .schemas import AnalyzeRequest, BatchRequest, MaterialInput, SkillRunRequest
 from .store import Store
 from .upload_limit import UploadBodyLimitMiddleware
 
@@ -135,6 +136,31 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(404, '分析报告不存在')
         return value
 
+    @application.get('/api/skills')
+    def skills():
+        return [skill.model_dump() for skill in list_skills()]
+
+    @application.post('/api/skills/{skill_id}/run')
+    async def run_business_skill(skill_id: str, data: SkillRunRequest):
+        try:
+            package = get_skill(skill_id)
+        except KeyError:
+            raise HTTPException(404, '业务技能不存在') from None
+        analysis = store.analysis(data.analysis_id)
+        if not analysis:
+            raise HTTPException(404, '分析报告不存在')
+        return await run_skill(package, analysis, config, store)
+
+    @application.get('/api/skill-runs')
+    def skill_runs(analysis_id: str = Query(min_length=1, max_length=64)):
+        return store.skill_runs(analysis_id)
+
+    @application.get('/api/skill-runs/{run_id}')
+    def skill_run(run_id: str):
+        value = store.skill_run(run_id)
+        if not value:
+            raise HTTPException(404, '技能运行记录不存在')
+        return value
     @application.post('/api/parse/resume')
     async def parse_resume(file: UploadFile = File(...)):
         filename = Path(file.filename or '').name

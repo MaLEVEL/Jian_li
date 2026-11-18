@@ -17,6 +17,11 @@ class Store:
         with self.connection() as db:
             db.execute('CREATE TABLE IF NOT EXISTS materials (id TEXT PRIMARY KEY, payload TEXT NOT NULL)')
             db.execute('CREATE TABLE IF NOT EXISTS analyses (id TEXT PRIMARY KEY, payload TEXT NOT NULL)')
+            db.execute(
+                'CREATE TABLE IF NOT EXISTS skill_runs '
+                '(id TEXT PRIMARY KEY, analysis_id TEXT NOT NULL, payload TEXT NOT NULL)'
+            )
+            db.execute('CREATE INDEX IF NOT EXISTS idx_skill_runs_analysis ON skill_runs (analysis_id)')
 
     @contextmanager
     def connection(self):
@@ -32,7 +37,8 @@ class Store:
 
     def materials(self) -> list[dict]:
         with self.connection() as db:
-            return [json.loads(row[0]) for row in db.execute('SELECT payload FROM materials ORDER BY rowid DESC')]
+            rows = db.execute('SELECT payload FROM materials ORDER BY rowid DESC')
+            return [json.loads(row[0]) for row in rows]
 
     def delete_material(self, material_id: str) -> bool:
         with self.connection() as db:
@@ -50,4 +56,24 @@ class Store:
     def analysis(self, analysis_id: str) -> dict | None:
         with self.connection() as db:
             row = db.execute('SELECT payload FROM analyses WHERE id=?', (analysis_id,)).fetchone()
+            return json.loads(row[0]) if row else None
+
+    def save_skill_run(self, result: dict) -> None:
+        with self.connection() as db:
+            db.execute(
+                'INSERT INTO skill_runs VALUES (?, ?, ?)',
+                (result['id'], result['analysis_id'], json.dumps(result, ensure_ascii=False)),
+            )
+
+    def skill_runs(self, analysis_id: str, limit: int = 100) -> list[dict]:
+        with self.connection() as db:
+            rows = db.execute(
+                'SELECT payload FROM skill_runs WHERE analysis_id=? ORDER BY rowid DESC LIMIT ?',
+                (analysis_id, limit),
+            )
+            return [json.loads(row[0]) for row in rows]
+
+    def skill_run(self, run_id: str) -> dict | None:
+        with self.connection() as db:
+            row = db.execute('SELECT payload FROM skill_runs WHERE id=?', (run_id,)).fetchone()
             return json.loads(row[0]) if row else None

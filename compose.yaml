@@ -8,6 +8,9 @@ services:
       JOBFIT_BASE_URL: ${JOBFIT_BASE_URL:-https://open.bigmodel.cn/api/paas/v4/}
       JOBFIT_MODEL: ${JOBFIT_MODEL:-glm-4-flash}
       JOBFIT_LLM_MODE: ${JOBFIT_LLM_MODE:-auto}
+      JOBFIT_TIMEOUT_SECONDS: ${JOBFIT_TIMEOUT_SECONDS:-30}
+      JOBFIT_MAX_RETRIES: ${JOBFIT_MAX_RETRIES:-2}
+      JOBFIT_REASONING_EFFORT: ${JOBFIT_REASONING_EFFORT:-}
       JOBFIT_RAG_MODE: local
       JOBFIT_DATA_DIR: /app/data
     volumes:
