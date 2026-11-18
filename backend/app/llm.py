@@ -42,11 +42,18 @@ class ModelClient:
                                                  headers=headers, json=body)
                     response.raise_for_status()
                     data = response.json()
+                    if not isinstance(data, dict):
+                        raise ValueError('Invalid model envelope')
                     usage = data.get('usage') or {}
+                    if not isinstance(usage, dict):
+                        raise ValueError('Invalid usage envelope')
                     for key in ('prompt_tokens', 'completion_tokens'):
                         self.usage[key] += max(0, int(usage.get(key, 0)))
                     self.usage['total_tokens'] = self.usage['prompt_tokens'] + self.usage['completion_tokens']
-                    content = data['choices'][0]['message']['content'].strip()
+                    content = data['choices'][0]['message']['content']
+                    if not isinstance(content, str):
+                        raise ValueError('Invalid message content')
+                    content = content.strip()
                     if content.startswith('```'):
                         content = content.split('\n', 1)[1].rsplit('```', 1)[0]
                     return schema.model_validate_json(content)

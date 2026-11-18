@@ -18,6 +18,7 @@ from .graph import run_analysis
 from .rag import MaterialRetriever
 from .schemas import AnalyzeRequest, BatchRequest, MaterialInput
 from .store import Store
+from .upload_limit import UploadBodyLimitMiddleware
 
 logger = logging.getLogger('jobfit')
 MAX_FILE_BYTES = 2 * 1024 * 1024
@@ -43,6 +44,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.add_middleware(CORSMiddleware,
         allow_origins=[value.strip() for value in config.cors_origins.split(',') if value.strip()],
         allow_methods=['GET', 'POST', 'DELETE'], allow_headers=['Content-Type'])
+    application.add_middleware(UploadBodyLimitMiddleware)
 
     @application.middleware('http')
     async def request_log(request: Request, call_next):

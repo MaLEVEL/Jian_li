@@ -39,3 +39,14 @@ async def test_auth_error_does_not_retry_or_leak_response():
         await client.complete('jd', 'Python', JobParsed)
     assert 'private-token' not in str(error.value)
     assert count == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('body', [[], {'usage': 'invalid'},
+    {'choices': [{'message': {'content': None}}]},
+    {'choices': [{'message': {'content': '{}'}}], 'usage': ['invalid']}])
+async def test_malformed_response_shapes_become_safe_model_errors(body):
+    client = ModelClient(Settings(api_key='test', max_retries=0),
+        transport=httpx.MockTransport(lambda request: httpx.Response(200, json=body)), retry_delay=0)
+    with pytest.raises(ModelUnavailable):
+        await client.complete('jd', 'Python', JobParsed)
