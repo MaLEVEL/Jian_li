@@ -1,11 +1,13 @@
 import { DEFAULT_PROFILE, RESUME_TEMPLATE_OPTIONS, STATUS_OPTIONS } from "./constants";
 import { createId, renderResumeText, splitLines, splitSkills } from "./resumeLogic";
+import { getResumeAppearanceDefaults, getResumeTemplateDefinition } from "./templateCatalog";
 import type {
   ApplicationRecord,
   CandidateProfile,
   InterviewQuestions,
   JobDraft,
   MatchReport,
+  ResumeAppearance,
   ResumeIdentity,
   ResumeSections,
   ResumeTemplate,
@@ -73,6 +75,37 @@ function coerceResumeTemplate(value: unknown): ResumeTemplate {
   return RESUME_TEMPLATE_OPTIONS.find((option) => option.value === raw)?.value ?? "graduate";
 }
 
+function clampNumber(value: unknown, fallback: number, min: number, max: number) {
+  const number = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(number) ? Math.max(min, Math.min(max, number)) : fallback;
+}
+
+function coerceAccent(value: unknown, fallback?: string) {
+  const raw = coerceString(value);
+  return /^#[0-9a-f]{6}$/i.test(raw) ? raw : fallback;
+}
+
+function coerceResumeAppearance(
+  value: unknown,
+  templateId: ResumeTemplate,
+): ResumeAppearance {
+  const defaults = getResumeAppearanceDefaults(getResumeTemplateDefinition(templateId));
+  const record = isRecord(value) ? value : {};
+  const rawFontFamily = coerceString(record.fontFamily);
+  const fontFamily =
+    rawFontFamily === "sans" || rawFontFamily === "serif" || rawFontFamily === "editorial"
+      ? rawFontFamily
+      : defaults.fontFamily;
+
+  return {
+    fontFamily,
+    fontSize: Math.round(clampNumber(record.fontSize, defaults.fontSize, 10.5, 16) * 2) / 2,
+    lineHeight: Math.round(clampNumber(record.lineHeight, defaults.lineHeight, 1.25, 2) * 20) / 20,
+    pageMargin: Math.round(clampNumber(record.pageMargin, defaults.pageMargin, 12, 24)),
+    pageCount: Number(record.pageCount) === 2 ? 2 : 1,
+    accent: coerceAccent(record.accent, defaults.accent),
+  };
+}
 function coerceResumeIdentity(value: unknown): ResumeIdentity | undefined {
   if (!isRecord(value)) {
     return undefined;
@@ -142,11 +175,13 @@ function coerceResume(value: unknown, profile: CandidateProfile): ResumeVersion 
       ? rawSource
       : "uploaded";
 
+  const template = coerceResumeTemplate(value.template);
   return {
     id: coerceString(value.id) || createId("resume"),
     title: coerceString(value.title) || "未命名简历",
     source,
-    template: coerceResumeTemplate(value.template),
+    template,
+    appearance: coerceResumeAppearance(value.appearance, template),
     identity: coerceResumeIdentity(value.identity),
     targetRole: coerceString(value.targetRole) || profile.targetRole || "目标岗位",
     company: coerceString(value.company) || undefined,

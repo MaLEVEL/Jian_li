@@ -176,38 +176,58 @@ h1, h2, h3 { text-wrap: balance; }
 .resume-paper--editorial h3 { color: var(--resume-accent); }
 .hero-document button { min-height: 44px; font-size: 13px; }
 .hero-document__top { font-size: 12px; }
-.template-library { display: grid; gap: 48px; }
+.template-library { display: grid; gap: 52px; }
 .template-library > section > header { margin-bottom: 23px; }
-.template-library h2 { margin: 0; font-size: 22px; font-weight: 650; }
+.template-library section[aria-labelledby="resume-template-library-title"] > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+.template-library h2 { margin: 0; font-size: 24px; font-weight: 650; letter-spacing: -.02em; }
 .template-library > section > header p { max-width: 68ch; margin: 9px 0 0; color: var(--muted); line-height: 1.8; }
-.template-library__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 26px; }
-.template-card { min-width: 0; padding: 0; text-align: left; background: transparent; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
-.template-card:hover { border-color: #6aa7cd; background: #edf7fd; }
-.template-card[data-selected="true"] { border-color: var(--green); box-shadow: 0 4px 15px #2f80ad12; }
-.template-card__preview { position: relative; display: grid; align-content: start; gap: 10px; min-height: 255px; margin: 21px 26px 0; padding: 25px 22px; background: white; border: 1px solid #d6e4ef; box-shadow: 0 8px 18px #245c8010; color: #4c7088; }
-.template-card__preview::before { content: ""; height: 8px; width: 32%; background: #2377a4; margin-bottom: 3px; }
-.template-card__preview > span { position: relative; min-height: 17px; border-bottom: 1px solid #dce9f2; font-size: 10px; padding-bottom: 5px; }
-.template-card__preview > span::after { content: ""; display: block; margin-top: 5px; height: 2px; width: 76%; background: #dce9f2; }
-.template-card .template-card__preview { border-top-color: var(--resume-accent); }
-.template-card .template-card__preview::before { background: var(--resume-accent); }
-.template-card__preview > span[data-section="intent"] { font-size: 11px; color: #175c84; }
+.template-library__count { flex: none; padding: 7px 10px; border: 1px solid #bdd8e5; border-radius: 999px; background: #edf8fd; color: #285e78; font-size: 12px; }
+.template-audience-filter { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 24px; }
+.template-audience-filter__option { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px 13px; border: 1px solid #c9dce6; border-radius: 999px; background: #fff; color: #426479; font-size: 13px; }
+.template-audience-filter__option small { display: grid; place-items: center; min-width: 20px; height: 20px; border-radius: 999px; background: #e8f3f8; font-size: 11px; }
+.template-audience-filter__option[data-selected="true"] { border-color: #2c7899; background: #dff1fa; color: #134f6b; box-shadow: inset 0 0 0 1px #2c7899; }
+.template-library__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
+.template-card { min-width: 0; overflow: hidden; border: 1px solid #d5e1e8; border-radius: 14px; background: #fff; transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease; }
+.template-card:hover { border-color: #79aac3; box-shadow: 0 12px 28px #264f6812; transform: translateY(-2px); }
+.template-card[data-selected="true"] { border-color: #2c7899; box-shadow: 0 0 0 2px #a6d5e9, 0 10px 24px #264f6814; }
+.template-card__select { display: grid; width: 100%; padding: 0; border: 0; border-radius: 0; background: transparent; color: inherit; text-align: left; }
+.template-card__select:focus-visible { outline: 3px solid #69b2d5; outline-offset: -3px; }
+.template-card__preview { position: relative; display: grid; align-content: start; gap: 8px; min-height: 238px; margin: 18px 20px 0; padding: 24px 20px; background: #fff; border: 1px solid #d6e4ef; box-shadow: 0 9px 20px #245c800f; color: #4c7088; }
+.template-card__preview::before { content: ""; height: 7px; width: 32%; background: var(--resume-accent); }
+.template-card__preview > span { position: relative; min-height: 16px; border-bottom: 1px solid #dce9f2; font-size: 10px; padding-bottom: 5px; }
+.template-card__preview > span::after { content: ""; display: block; margin-top: 5px; height: 2px; width: 76%; background: #e2edf3; }
+.template-card__preview > span[data-section="intent"] { font-size: 11px; color: var(--resume-accent); }
 .template-card__preview > span[data-section="awards"] { display: none; }
-.template-card[data-template-id="graduate"] .template-card__preview { border-top: 4px solid #4a9cc8; }
-.template-card[data-template-id="internship"] .template-card__preview { border-top: 4px solid #7ea4b5; }
-.template-card[data-template-id="experienced"] .template-card__preview::before { width: 45%; background: #224962; }
-.template-card[data-template-id="technical"] .template-card__preview { gap: 12px; border-top: 2px solid #1d678f; }
-.template-card[data-template-id="sidebar"] .template-card__preview { grid-template-columns: .7fr 1.3fr; gap: 12px; }
-.template-card[data-template-id="sidebar"] .template-card__preview::before { grid-column: 1 / -1; }
-.template-card[data-template-id="sidebar"] [data-section="intent"], .template-card[data-template-id="sidebar"] [data-section="summary"] { grid-column: 1 / -1; }
-.template-card[data-template-id="sidebar"] [data-section="skills"], .template-card[data-template-id="sidebar"] [data-section="education"] { grid-column: 1; background: #eaf4fb; }
-.template-card[data-template-id="sidebar"] [data-section="projects"] { grid-column: 2; grid-row: 4 / span 2; }
-.template-card[data-template-id="sidebar"] [data-section="experience"] { grid-column: 2; }
-.template-card[data-template-id="editorial"] .template-card__preview { padding-top: 29px; border-top: 4px solid #b89962; }
-.template-card[data-template-id="editorial"] [data-section="projects"] { min-height: 35px; }
-.template-card__body { display: grid; gap: 8px; padding: 22px; }
-.template-card__body > strong { font-size: 16px; color: var(--ink); font-weight: 650; }
+.template-card[data-template-id="graduate-research"] .template-card__preview::before { width: 44%; margin-inline: auto; }
+.template-card[data-template-id="internship"] .template-card__preview { gap: 11px; }
+.template-card[data-template-id="internship-project"] [data-section="projects"] { min-height: 34px; border: 1px solid color-mix(in srgb, var(--resume-accent) 35%, white); padding: 7px; }
+.template-card[data-template-id="experienced"] .template-card__preview > span[data-section="experience"] { min-height: 48px; }
+.template-card[data-template-id="experienced-specialist"] .template-card__preview { padding-left: 31px; border-left: 4px solid var(--resume-accent); }
+.template-card[data-template-id="technical"] .template-card__preview { gap: 13px; border-radius: 0; }
+.template-card[data-template-id="technical-timeline"] .template-card__preview { padding-left: 33px; }
+.template-card[data-template-id="technical-timeline"] .template-card__preview::after { content: ""; position: absolute; left: 21px; top: 35px; bottom: 20px; width: 2px; background: color-mix(in srgb, var(--resume-accent) 45%, white); }
+.template-card[data-template-id="sidebar"] .template-card__preview, .template-card[data-template-id="design-portfolio"] .template-card__preview { grid-template-columns: .72fr 1.28fr; gap: 11px; }
+.template-card[data-template-id="sidebar"] .template-card__preview::before, .template-card[data-template-id="design-portfolio"] .template-card__preview::before { grid-column: 1 / -1; }
+.template-card[data-template-id="sidebar"] [data-section="skills"], .template-card[data-template-id="sidebar"] [data-section="education"], .template-card[data-template-id="design-portfolio"] [data-section="skills"], .template-card[data-template-id="design-portfolio"] [data-section="awards"] { grid-column: 1; background: color-mix(in srgb, var(--resume-accent) 8%, white); }
+.template-card[data-template-id="sidebar"] [data-section="projects"], .template-card[data-template-id="design-portfolio"] [data-section="projects"] { grid-column: 2; grid-row: 3 / span 2; min-height: 62px; }
+.template-card[data-template-id="operations-impact"] [data-section="awards"] { display: block; padding: 6px; border: 0; background: color-mix(in srgb, var(--resume-accent) 9%, white); }
+.template-card[data-template-id="editorial"] .template-card__preview { padding-top: 31px; border-top: 4px solid var(--resume-accent); }
+.template-card[data-template-id="editorial"] [data-section="projects"] { min-height: 43px; border-bottom: 0; font-size: 12px; }
+.template-card[data-template-id="design-portfolio"] .template-card__preview { border-right: 7px solid color-mix(in srgb, var(--resume-accent) 22%, white); }
+.template-card[data-template-id="management"] .template-card__preview::before { width: 100%; height: 14px; }
+.template-card[data-template-id="consulting"] .template-card__preview > span { margin-left: 10px; padding-left: 8px; border-left: 2px solid color-mix(in srgb, var(--resume-accent) 50%, white); }
+.template-card[data-template-id="academic"] .template-card__preview { text-align: center; }
+.template-card[data-template-id="academic"] .template-card__preview::before { width: 52%; margin-inline: auto; }
+.template-card[data-template-id="academic-compact"] .template-card__preview { gap: 4px; padding-block: 19px; }
+.template-card__body { display: grid; gap: 7px; padding: 19px 20px 20px; }
+.template-card__eyebrow { color: #547486; font-size: 11px; font-weight: 600; letter-spacing: .04em; }
+.template-card__body > strong { font-size: 17px; color: var(--ink); font-weight: 650; }
 .template-card__body > small { min-height: 44px; font-size: 13px; line-height: 1.7; color: var(--muted); }
-.template-card__action { display: flex; justify-content: space-between; align-items: center; min-height: 32px; color: var(--green-dark); font-size: 13px; font-weight: 600; }
+.template-card__action { display: flex; justify-content: space-between; align-items: center; min-height: 32px; color: #155d7d; font-size: 13px; font-weight: 650; }
+.template-card__source { border-top: 1px solid #e0eaf0; padding: 0 18px 15px; background: #f8fcfe; }
+.template-card__source summary { min-height: 42px; padding-top: 11px; color: #577486; font-size: 12px; cursor: pointer; }
+.template-card__source p { margin: 4px 0 10px; color: #647d8b; font-size: 12px; line-height: 1.65; }
+.template-card__source a { display: inline-flex; align-items: center; gap: 4px; color: #1d6687; font-size: 12px; font-weight: 600; }
 .job-framework-picker { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 23px; }
 .job-framework-picker__option { padding: 11px 18px; min-height: 44px; color: #43647a; background: #e8f2f9; border: 1px solid var(--line); border-radius: 7px; }
 .job-framework-picker__option strong { font-size: 14px; font-weight: 550; }

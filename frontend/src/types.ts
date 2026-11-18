@@ -2,7 +2,23 @@ export type TabId = "workspace" | "agent" | "templates" | "profile" | "builder" 
 
 export type ResumeSource = "generated" | "optimized" | "uploaded";
 
-export type ResumeTemplate = "graduate" | "internship" | "experienced" | "technical" | "sidebar" | "editorial";
+export type ResumeTemplate =
+  | "graduate"
+  | "graduate-research"
+  | "internship"
+  | "internship-project"
+  | "experienced"
+  | "experienced-specialist"
+  | "technical"
+  | "technical-timeline"
+  | "sidebar"
+  | "operations-impact"
+  | "editorial"
+  | "design-portfolio"
+  | "management"
+  | "consulting"
+  | "academic"
+  | "academic-compact";
 
 export type ApplicationStatus =
   | "saved"
@@ -44,24 +60,46 @@ export interface ResumeSections {
 
 export type ResumeSectionId = "intent" | "summary" | "skills" | "education" | "projects" | "experience" | "awards";
 
+export type ResumeAudience =
+  | "campus"
+  | "internship"
+  | "professional"
+  | "technical"
+  | "product-operations"
+  | "design-creative"
+  | "management-consulting"
+  | "academic-research";
+
 export type ResumeTemplateLayout =
-  | "education-first"
-  | "skills-first"
-  | "experience-first"
-  | "single-column"
-  | "two-column-sidebar"
-  | "project-first";
+  | "campus-growth"
+  | "campus-research"
+  | "internship-skills"
+  | "internship-project"
+  | "professional-impact"
+  | "professional-depth"
+  | "technical-ats"
+  | "technical-timeline"
+  | "product-sidebar"
+  | "operations-metrics"
+  | "design-editorial"
+  | "portfolio-sidebar"
+  | "management-brief"
+  | "consulting-case"
+  | "academic-classic"
+  | "academic-compact";
 
 export interface ResumeTemplateSource {
-  kind: "original";
+  kind: "original" | "open-source";
   creator: string;
   license: string;
   note: string;
+  url?: string;
 }
 
 export interface ResumeTemplateDefinition {
   id: ResumeTemplate;
   name: string;
+  audience: ResumeAudience;
   layout: ResumeTemplateLayout;
   accent: string;
   sectionOrder: ResumeSectionId[];
@@ -70,7 +108,30 @@ export interface ResumeTemplateDefinition {
   source: ResumeTemplateSource;
 }
 
-export type JobFrameworkId = "python-backend" | "agent-rag" | "fullstack" | "data-analysis";
+export type ResumeFontFamily = "sans" | "serif" | "editorial";
+
+export type ResumePageCount = 1 | 2;
+
+export interface ResumeAppearance {
+  fontFamily: ResumeFontFamily;
+  fontSize: number;
+  lineHeight: number;
+  pageMargin: number;
+  pageCount: ResumePageCount;
+  accent?: string;
+}
+
+export type JobFrameworkId =
+  | "python-backend"
+  | "agent-rag"
+  | "fullstack"
+  | "data-analysis"
+  | "campus-early-career"
+  | "internship-entry"
+  | "product-operations"
+  | "design-creative"
+  | "management-consulting"
+  | "academic-research";
 
 export interface JobFrameworkSection {
   id: string;
@@ -114,6 +175,7 @@ export interface ResumeVersion {
   company?: string;
   jobTitle?: string;
   parentResumeId?: string;
+  appearance?: ResumeAppearance;
   sections: ResumeSections;
   plainText: string;
   unsupportedClaims: string[];
@@ -123,7 +185,7 @@ export interface ResumeVersion {
 }
 
 export type ResumeContentPatch = Partial<
-  Pick<ResumeVersion, "identity" | "targetRole" | "sections">
+  Pick<ResumeVersion, "identity" | "targetRole" | "sections" | "appearance">
 >;
 
 export interface ResumeImportDraft {

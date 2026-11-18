@@ -1,6 +1,6 @@
 import type { Document as DocxDocument, Paragraph as DocxParagraph, Table as DocxTable } from "docx";
 import { KEYWORD_BANK } from "./constants";
-import { getResumeSectionOrder, getResumeTemplateDefinition } from "./templateCatalog";
+import { getResumeAppearanceDefaults, getResumeFontOption, getResumeSectionOrder, getResumeTemplateDefinition, isSidebarResumeLayout } from "./templateCatalog";
 import type {
   CandidateProfile,
   InterviewQuestions,
@@ -8,12 +8,58 @@ import type {
   MatchReport,
   QualityIssue,
   ResumeQualityReport,
+  ResumeAppearance,
   ResumeIdentity,
   ResumeSections,
   ResumeSectionId,
+  ResumeTemplateLayout,
   ResumeVersion,
 } from "./types";
 
+export function resolveResumeAppearance(resume: ResumeVersion): ResumeAppearance {
+  const defaults = getResumeAppearanceDefaults(getResumeTemplateDefinition(resume.template));
+  const appearance = resume.appearance;
+  if (!appearance) {
+    return defaults;
+  }
+  return {
+    fontFamily: appearance.fontFamily ?? defaults.fontFamily,
+    fontSize: appearance.fontSize ?? defaults.fontSize,
+    lineHeight: appearance.lineHeight ?? defaults.lineHeight,
+    pageMargin: appearance.pageMargin ?? defaults.pageMargin,
+    pageCount: appearance.pageCount ?? defaults.pageCount,
+    accent: appearance.accent ?? defaults.accent,
+  };
+}
+const DOCX_LAYOUT_PROFILES: Record<ResumeTemplateLayout, {
+  centeredHeader: boolean;
+  titleExtra: number;
+  headingBorderSize: number;
+  headingIndent?: number;
+  paragraphIndent?: number;
+  headingBefore: number;
+  headingAfter: number;
+  paragraphAfter: number;
+  bulletAfter: number;
+  allCaps: boolean;
+}> = {
+  "campus-growth": { centeredHeader: false, titleExtra: 8, headingBorderSize: 6, headingBefore: 180, headingAfter: 100, paragraphAfter: 100, bulletAfter: 80, allCaps: false },
+  "campus-research": { centeredHeader: true, titleExtra: 6, headingBorderSize: 0, headingBefore: 170, headingAfter: 100, paragraphAfter: 90, bulletAfter: 70, allCaps: false },
+  "internship-skills": { centeredHeader: false, titleExtra: 6, headingBorderSize: 0, headingBefore: 150, headingAfter: 100, paragraphAfter: 90, bulletAfter: 75, allCaps: false },
+  "internship-project": { centeredHeader: false, titleExtra: 7, headingBorderSize: 2, headingBefore: 165, headingAfter: 100, paragraphAfter: 110, bulletAfter: 95, allCaps: false },
+  "professional-impact": { centeredHeader: false, titleExtra: 8, headingBorderSize: 10, headingBefore: 200, headingAfter: 110, paragraphAfter: 110, bulletAfter: 85, allCaps: false },
+  "professional-depth": { centeredHeader: false, titleExtra: 6, headingBorderSize: 0, headingIndent: 240, paragraphIndent: 240, headingBefore: 190, headingAfter: 100, paragraphAfter: 100, bulletAfter: 80, allCaps: false },
+  "technical-ats": { centeredHeader: false, titleExtra: 4, headingBorderSize: 4, headingBefore: 150, headingAfter: 80, paragraphAfter: 80, bulletAfter: 65, allCaps: true },
+  "technical-timeline": { centeredHeader: false, titleExtra: 6, headingBorderSize: 0, headingIndent: 260, paragraphIndent: 500, headingBefore: 170, headingAfter: 95, paragraphAfter: 95, bulletAfter: 75, allCaps: false },
+  "product-sidebar": { centeredHeader: false, titleExtra: 5, headingBorderSize: 4, headingBefore: 165, headingAfter: 90, paragraphAfter: 95, bulletAfter: 75, allCaps: false },
+  "operations-metrics": { centeredHeader: false, titleExtra: 7, headingBorderSize: 8, headingBefore: 185, headingAfter: 105, paragraphAfter: 105, bulletAfter: 85, allCaps: false },
+  "design-editorial": { centeredHeader: false, titleExtra: 16, headingBorderSize: 0, headingBefore: 180, headingAfter: 100, paragraphAfter: 105, bulletAfter: 85, allCaps: false },
+  "portfolio-sidebar": { centeredHeader: false, titleExtra: 9, headingBorderSize: 4, headingBefore: 170, headingAfter: 90, paragraphAfter: 95, bulletAfter: 75, allCaps: false },
+  "management-brief": { centeredHeader: false, titleExtra: 10, headingBorderSize: 12, headingBefore: 220, headingAfter: 110, paragraphAfter: 115, bulletAfter: 90, allCaps: false },
+  "consulting-case": { centeredHeader: false, titleExtra: 7, headingBorderSize: 4, headingIndent: 180, paragraphIndent: 180, headingBefore: 190, headingAfter: 100, paragraphAfter: 110, bulletAfter: 110, allCaps: false },
+  "academic-classic": { centeredHeader: true, titleExtra: 5, headingBorderSize: 4, headingBefore: 210, headingAfter: 90, paragraphAfter: 85, bulletAfter: 70, allCaps: false },
+  "academic-compact": { centeredHeader: true, titleExtra: 4, headingBorderSize: 4, headingBefore: 100, headingAfter: 55, paragraphAfter: 55, bulletAfter: 45, allCaps: false },
+};
 const STOP_WORDS = new Set([
   "a",
   "an",
@@ -260,7 +306,19 @@ export function inspectResumeQuality(resume: ResumeVersion): ResumeQualityReport
   const issues: QualityIssue[] = [];
   const projectAndExperience = [...resume.sections.projects, ...resume.sections.experience];
   const contentUnits = resume.plainText.replace(/\s/g, "").length + projectAndExperience.length * 36;
-  const estimatedPages = Math.max(1, Math.ceil(contentUnits / 1150));
+  const appearance = resolveResumeAppearance(resume);
+  const template = getResumeTemplateDefinition(resume.template);
+
+  const baseArea = (210 - 32) * (297 - 32);
+  const usableArea = (210 - appearance.pageMargin * 2) * (297 - appearance.pageMargin * 2);
+  const typographyFactor = Math.pow(12 / appearance.fontSize, 1.8) * (1.55 / appearance.lineHeight);
+  const layoutFactor = isSidebarResumeLayout(template.layout)
+    ? 0.86
+    : template.layout === "academic-compact"
+      ? 1.08
+      : 1;
+  const estimatedUnitsPerPage = Math.max(420, 1150 * typographyFactor * (usableArea / baseArea) * layoutFactor);
+  const estimatedPages = Math.max(1, Math.ceil(contentUnits / estimatedUnitsPerPage));
   const quantifiedLines = projectAndExperience.filter((item) => NUMBER_PATTERN.test(item));
   const resultLines = projectAndExperience.filter((item) => RESULT_PATTERN.test(item));
   const vagueLines = projectAndExperience.filter((item) => VAGUE_PATTERN.test(item));
@@ -313,19 +371,27 @@ export function inspectResumeQuality(resume: ResumeVersion): ResumeQualityReport
     });
   }
 
-  if (estimatedPages > 1) {
+  const pageBudget = resolveResumeAppearance(resume).pageCount;
+  if (estimatedPages > pageBudget) {
     issues.push({
       id: "one-page",
       level: "warn",
-      title: "可能超过一页",
+      title: `可能超过${pageBudget === 1 ? "一页" : "两页"}`,
       detail: `当前内容估算约 ${estimatedPages} 页，建议压缩低相关经历，优先保留和目标岗位最相关的项目。`,
+    });
+  } else if (pageBudget === 2 && estimatedPages === 2) {
+    issues.push({
+      id: "one-page",
+      level: "good",
+      title: "适合双页简历",
+      detail: "当前内容量在双页预算内，导出时仍请检查分页处是否切断关键项目。",
     });
   } else {
     issues.push({
       id: "one-page",
       level: "good",
-      title: "一页纸可读",
-      detail: "当前内容量适合一页纸简历，导出前再检查排版密度。",
+      title: pageBudget === 1 ? "一页纸可读" : "双页简历仍较精简",
+      detail: pageBudget === 1 ? "当前内容量适合一页纸简历，导出前再检查排版密度。" : "当前内容可放在两页内，也可以切换单页获得更紧凑的表达。",
     });
   }
 
@@ -685,6 +751,7 @@ export function optimizeResume(profile: CandidateProfile, resume: ResumeVersion,
 
 export async function buildResumeDocument(profile: CandidateProfile, resume: ResumeVersion): Promise<DocxDocument> {
   const {
+    AlignmentType,
     BorderStyle,
     Document,
     HeadingLevel,
@@ -699,12 +766,23 @@ export async function buildResumeDocument(profile: CandidateProfile, resume: Res
   } = await import("docx");
 
   const template = getResumeTemplateDefinition(resume.template);
-  const accent = template.accent.replace("#", "").toUpperCase();
+  const layoutProfile = DOCX_LAYOUT_PROFILES[template.layout];
+
+  const appearance = resolveResumeAppearance(resume);
+  const font = getResumeFontOption(appearance.fontFamily);
+  const accent = (appearance.accent ?? template.accent).replace("#", "").toUpperCase();
   const identity = getResumeIdentity(profile, resume);
+  const bodySize = Math.round(appearance.fontSize * 2);
+  const headingSize = bodySize + 4;
+  const lineSpacing = Math.round(appearance.lineHeight * 240);
+  const pageMargin = Math.round(appearance.pageMargin * 56.7);
+  const sideSectionIds = new Set<ResumeSectionId>(["skills", "education", "awards"]);
+
   const paragraph = (text: string) =>
     new Paragraph({
-      children: [new TextRun({ text, size: template.id === "editorial" ? 23 : 22 })],
-      spacing: { after: template.id === "technical" ? 70 : 100 },
+      children: [new TextRun({ text, font: font.wordFont, size: bodySize })],
+      spacing: { line: lineSpacing, after: layoutProfile.paragraphAfter },
+      indent: layoutProfile.paragraphIndent ? { left: layoutProfile.paragraphIndent } : undefined,
     });
   const heading = (text: string) =>
     new Paragraph({
@@ -712,32 +790,38 @@ export async function buildResumeDocument(profile: CandidateProfile, resume: Res
       children: [
         new TextRun({
           text,
+          font: font.wordFont,
           bold: true,
           color: accent,
-          size: template.id === "editorial" ? 28 : 26,
-          allCaps: template.id === "technical",
+          size: headingSize,
+          allCaps: layoutProfile.allCaps,
         }),
       ],
       border: {
         bottom:
-          template.id === "editorial"
-            ? undefined
-            : {
+          layoutProfile.headingBorderSize > 0
+            ? {
                 color: accent,
-                size: template.id === "sidebar" ? 4 : 6,
+                size: layoutProfile.headingBorderSize,
                 space: 1,
                 style: BorderStyle.SINGLE,
-              },
+              }
+            : undefined,
       },
-      spacing: { before: template.id === "technical" ? 180 : 220, after: template.id === "technical" ? 90 : 120 },
+      indent: layoutProfile.headingIndent ? { left: layoutProfile.headingIndent } : undefined,
+      spacing: {
+        before: layoutProfile.headingBefore,
+        after: layoutProfile.headingAfter,
+      },
     });
   const bullet = (text: string) =>
     new Paragraph({
-      children: [new TextRun({ text, size: 22 })],
+      children: [new TextRun({ text, font: font.wordFont, size: bodySize })],
       bullet: { level: 0 },
-      spacing: { after: 80 },
+      indent: layoutProfile.paragraphIndent ? { left: layoutProfile.paragraphIndent + 240 } : undefined,
+      spacing: { line: lineSpacing, after: layoutProfile.bulletAfter },
     });
-  const section = (sectionData: { title: string; items: string[] }) => {
+  const section = (sectionData: { id: ResumeSectionId; title: string; items: string[] }) => {
     const visibleItems = sectionData.items.filter(Boolean);
     if (!visibleItems.length) {
       return [];
@@ -749,26 +833,28 @@ export async function buildResumeDocument(profile: CandidateProfile, resume: Res
   };
 
   const orderedSections = getOrderedResumeSections(resume);
-  const sideSectionIds = new Set(["skills", "education", "awards"]);
   const children: Array<DocxParagraph | DocxTable> = [
     new Paragraph({
       children: [
         new TextRun({
           text: identity.name,
+          font: font.wordFont,
           bold: true,
           color: accent,
-          size: template.id === "editorial" ? 40 : 34,
+          size: bodySize + layoutProfile.titleExtra,
         }),
       ],
+      alignment: layoutProfile.centeredHeader ? AlignmentType.CENTER : AlignmentType.LEFT,
       spacing: { after: 80 },
     }),
     new Paragraph({
-      children: [new TextRun({ text: formatContact(identity), color: "4C5A52", size: 20 })],
-      spacing: { after: 220 },
+      children: [new TextRun({ text: formatContact(identity), font: font.wordFont, color: "4C5A52", size: bodySize - 2 })],
+      alignment: layoutProfile.centeredHeader ? AlignmentType.CENTER : AlignmentType.LEFT,
+      spacing: { line: lineSpacing, after: 220 },
     }),
   ];
 
-  if (template.layout === "two-column-sidebar") {
+  if (isSidebarResumeLayout(template.layout)) {
     const sideChildren = orderedSections
       .filter((sectionData) => sideSectionIds.has(sectionData.id))
       .flatMap(section);
@@ -786,7 +872,7 @@ export async function buildResumeDocument(profile: CandidateProfile, resume: Res
             ],
           }),
         ],
-        columnWidths: [3100, 6400],
+        columnWidths: template.layout === "portfolio-sidebar" ? [3000, 6500] : [3400, 6100],
         width: { size: 100, type: WidthType.PERCENTAGE },
         layout: TableLayoutType.FIXED,
         borders: TableBorders.NONE,
@@ -805,10 +891,10 @@ export async function buildResumeDocument(profile: CandidateProfile, resume: Res
         properties: {
           page: {
             margin: {
-              top: 720,
-              right: 720,
-              bottom: 720,
-              left: 720,
+              top: pageMargin,
+              right: pageMargin,
+              bottom: pageMargin,
+              left: pageMargin,
             },
           },
         },
@@ -817,7 +903,6 @@ export async function buildResumeDocument(profile: CandidateProfile, resume: Res
     ],
   });
 }
-
 export async function downloadDocxFile(profile: CandidateProfile, resume: ResumeVersion) {
   const { Packer } = await import("docx");
   const doc = await buildResumeDocument(profile, resume);
@@ -832,8 +917,11 @@ export async function downloadDocxFile(profile: CandidateProfile, resume: Resume
 
 export function renderResumeHtml(profile: CandidateProfile, resume: ResumeVersion) {
   const template = getResumeTemplateDefinition(resume.template);
+
+  const appearance = resolveResumeAppearance(resume);
+  const font = getResumeFontOption(appearance.fontFamily);
   const identity = getResumeIdentity(profile, resume);
-  const accent = template.accent;
+  const accent = /^#[0-9a-f]{6}$/i.test(appearance.accent ?? "") ? appearance.accent! : template.accent;
   const escape = (value: string) =>
     value
       .replace(/&/g, "&amp;")
@@ -854,52 +942,70 @@ export function renderResumeHtml(profile: CandidateProfile, resume: ResumeVersio
 
   const orderedSections = getOrderedResumeSections(resume);
   const sideSectionIds = new Set(["skills", "education", "awards"]);
-  const bodyHtml =
-    template.layout === "two-column-sidebar"
-      ? `<aside class="resume-side" aria-label="侧栏信息">${orderedSections
-          .filter((sectionData) => sideSectionIds.has(sectionData.id))
-          .map(sectionHtml)
-          .join("")}</aside><div class="resume-main" aria-label="主要内容">${orderedSections
-          .filter((sectionData) => !sideSectionIds.has(sectionData.id))
-          .map(sectionHtml)
-          .join("")}</div>`
-      : orderedSections.map(sectionHtml).join("");
+  const bodyHtml = isSidebarResumeLayout(template.layout)
+    ? `<aside class="resume-side" aria-label="侧栏信息">${orderedSections
+        .filter((sectionData) => sideSectionIds.has(sectionData.id))
+        .map(sectionHtml)
+        .join("")}</aside><div class="resume-main" aria-label="主要内容">${orderedSections
+        .filter((sectionData) => !sideSectionIds.has(sectionData.id))
+        .map(sectionHtml)
+        .join("")}</div>`
+    : orderedSections.map(sectionHtml).join("");
 
-  const layoutStyles =
-    template.layout === "two-column-sidebar"
-      ? ` .resume-layout--two-column-sidebar { display: grid; grid-template-columns: minmax(0, 0.32fr) minmax(0, 0.68fr); gap: 14mm; align-items: start; } .resume-side, .resume-main { min-width: 0; } .resume-layout--two-column-sidebar h2 { border-bottom: 1px solid ${accent}; font-size: 12px; }`
-      : "";
-  const titleStyles = `
-    .resume-layout--education-first h2 { border-bottom: 1px solid ${accent}; }
-    .resume-layout--skills-first h2 { letter-spacing: 0.08em; text-transform: uppercase; }
-    .resume-layout--experience-first h2 { border-bottom: 2px solid ${accent}; }
-    .resume-layout--single-column h2 { border-bottom: 1px solid ${accent}; letter-spacing: 0.04em; }
-    .resume-layout--project-first h2 { border-bottom: 0; color: ${accent}; font-size: 16px; letter-spacing: 0.02em; }
-  `;
+  const layoutStyles: Record<string, string> = {
+    "campus-growth": `.resume-layout--campus-growth h2 { border-bottom: 1.5px solid ${accent}; }`,
+    "campus-research": `.resume-layout--campus-research header { text-align: center; } .resume-layout--campus-research h2 { border-top: 1px solid ${accent}; border-bottom: 0; padding-top: 5px; }`,
+    "internship-skills": `.resume-layout--internship-skills h2 { display: inline-block; padding: 2px 8px; background: ${accent}14; border-bottom: 0; }`,
+    "internship-project": `.resume-layout--internship-project section[data-section-id="projects"] { padding: 12px 0; border-block: 1px solid ${accent}55; }`,
+    "professional-impact": `.resume-layout--professional-impact h2 { border-bottom: 2px solid ${accent}; letter-spacing: .04em; }`,
+    "professional-depth": `.resume-layout--professional-depth h2 { color: #283e4a; border-left: 4px solid ${accent}; padding-left: 8px; border-bottom: 0; }`,
+    "technical-ats": `.resume-layout--technical-ats h2 { text-transform: uppercase; letter-spacing: .1em; border-bottom: 1px solid #9aabb4; }`,
+    "technical-timeline": `.resume-layout--technical-timeline section { margin-left: 12px; padding-left: 16px; border-left: 2px solid ${accent}55; } .resume-layout--technical-timeline h2::before { content: ""; display: inline-block; width: 7px; height: 7px; margin: 0 8px 1px -21px; border-radius: 50%; background: ${accent}; }`,
+    "product-sidebar": `.resume-layout--product-sidebar { display: grid; grid-template-columns: minmax(0, 0.32fr) minmax(0, 0.68fr); gap: 14mm; align-items: start; } .resume-layout--product-sidebar .resume-side { padding: 9mm 5mm; background: ${accent}10; }`,
+    "operations-metrics": `.resume-layout--operations-metrics h2 { border-bottom: 3px solid ${accent}; } .resume-layout--operations-metrics section[data-section-id="awards"] { padding: 8px 10px; background: ${accent}0d; }`,
+    "design-editorial": `.resume-layout--design-editorial h2 { border-bottom: 0; color: ${accent}; font-size: 1.45em; } .resume-layout--design-editorial section[data-section-id="projects"] { padding: 10px 0; border-block: 1px solid #d6e7ef; }`,
+    "portfolio-sidebar": `.resume-layout--portfolio-sidebar { display: grid; grid-template-columns: minmax(0, 0.3fr) minmax(0, 0.7fr); gap: 13mm; align-items: start; } .resume-layout--portfolio-sidebar .resume-side { border-right: 1px solid ${accent}; padding-right: 6mm; }`,
+    "management-brief": `.resume-layout--management-brief header { padding-bottom: 12px; border-bottom: 5px solid ${accent}; } .resume-layout--management-brief h2 { border-bottom: 1px solid #a6bcc7; }`,
+    "consulting-case": `.resume-layout--consulting-case h2 { border-left: 3px solid ${accent}; padding-left: 7px; border-bottom: 1px solid #cbd8de; } .resume-layout--consulting-case li { margin-block: 5px; }`,
+    "academic-classic": `.resume-layout--academic-classic header { text-align: center; } .resume-layout--academic-classic h2 { border-bottom: 1px solid ${accent}; text-transform: uppercase; letter-spacing: .06em; }`,
+    "academic-compact": `.resume-layout--academic-compact h2 { border-bottom: 1px solid #9fb4bf; font-size: 1.05em; } .resume-layout--academic-compact section { margin-top: 9px; }`,
+  };
 
   return `<!doctype html>
-<html>
+<html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>${escape(resume.title)}</title>
   <style>
-    @page { size: A4; margin: 12mm; }
-    body { margin: 0; color: #151b17; font-family: "Microsoft YaHei", "Segoe UI", Arial, sans-serif; line-height: 1.45; }
-    .resume-sheet { max-width: 760px; margin: 0 auto; }
+    @page { size: A4; margin: ${appearance.pageMargin}mm; }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: #151b17; font-family: ${font.stack}; font-size: ${appearance.fontSize}pt; line-height: ${appearance.lineHeight}; }
+    .resume-sheet { width: auto; max-width: 210mm; min-height: ${appearance.pageCount === 1 ? "297mm" : "594mm"}; margin: 0 auto; padding: 0; background: white; }
+    .resume-sheet[data-page-count="2"] { box-shadow: inset 0 0 0 1px #e1edf3; }
     header { border-bottom: 2px solid ${accent}; padding-bottom: 10px; margin-bottom: 12px; }
-    h1 { margin: 0; color: ${accent}; font-size: ${template.id === "editorial" ? "31px" : "26px"}; letter-spacing: ${template.id === "editorial" ? "0.02em" : "0"}; }
-    .meta { margin-top: 4px; color: #4c5a52; font-size: 12px; }
+    h1 { margin: 0; color: ${accent}; font-size: ${template.layout === "design-editorial" ? "2.35em" : "2em"}; letter-spacing: ${template.layout === "design-editorial" ? "0.02em" : "0"}; }
+    .meta { margin-top: 4px; color: #4c5a52; font-size: .88em; }
     .resume-layout { display: block; }
-    h2 { margin: 14px 0 7px; border-bottom: 1px solid #d7ddd7; color: ${accent}; font-size: 14px; padding-bottom: 4px; }
-    p, li { font-size: 12px; }
+    h2 { margin: 1.1em 0 .55em; border-bottom: 1px solid #d7ddd7; color: ${accent}; font-size: 1.15em; padding-bottom: 4px; }
+    p, li { font-size: 1em; }
     p { margin: 0; }
     ul { margin: 0; padding-left: 18px; }
-    li { margin: 4px 0; }${titleStyles}${layoutStyles}
-    @media print { .resume-sheet { max-width: none; } }
+    li { margin: .28em 0; }
+    .resume-side, .resume-main { min-width: 0; }
+    ${layoutStyles[template.layout]}
+    @media screen {
+      body { padding: 24px; background: #edf5f9; }
+      .resume-sheet { width: 210mm; padding: ${appearance.pageMargin}mm; box-shadow: 0 8px 28px #1d4d6517; }
+    }
+    @media print {
+      .resume-sheet { width: auto; min-height: auto; max-width: none; padding: 0; box-shadow: none; }
+      section { break-inside: avoid-page; }
+    }
   </style>
 </head>
 <body>
-  <main class="resume-sheet" data-template-id="${escape(template.id)}" data-layout="${escape(template.layout)}">
+  <main class="resume-sheet resume-layout--${escape(template.layout)}" data-template-id="${escape(template.id)}" data-layout="${escape(template.layout)}" data-page-count="${appearance.pageCount}">
     <header>
       <h1>${escape(identity.name)}</h1>
       <div class="meta">${escape(formatContact(identity))}</div>
@@ -909,7 +1015,6 @@ export function renderResumeHtml(profile: CandidateProfile, resume: ResumeVersio
 </body>
 </html>`;
 }
-
 export function printResumeAsPdf(profile: CandidateProfile, resume: ResumeVersion) {
   const printWindow = window.open("", "_blank", "width=900,height=1200");
   if (!printWindow) {

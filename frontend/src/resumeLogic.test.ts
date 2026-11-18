@@ -115,6 +115,40 @@ describe("resume logic", () => {
     expect(report.issues.some((issue) => issue.id === "quantified-results" && issue.level === "good")).toBe(true);
   });
 
+  it("increases the page estimate when typography and margins reduce capacity", () => {
+    const content = "参与项目并完成交付".repeat(180);
+    const compact = inspectResumeQuality({ ...baseResume, plainText: content });
+    const spacious = inspectResumeQuality({
+      ...baseResume,
+      plainText: content,
+      appearance: {
+        fontFamily: "serif",
+        fontSize: 16,
+        lineHeight: 2,
+        pageMargin: 24,
+        pageCount: 2,
+      },
+    });
+    expect(spacious.estimatedPages).toBeGreaterThan(compact.estimatedPages);
+  });
+  it("uses the selected two-page budget when evaluating page length", () => {
+    const longResume: ResumeVersion = {
+      ...baseResume,
+      plainText: "真实项目经历".repeat(300),
+      appearance: {
+        fontFamily: "sans",
+        fontSize: 12,
+        lineHeight: 1.5,
+        pageMargin: 16,
+        pageCount: 2,
+      },
+    };
+
+    const report = inspectResumeQuality(longResume);
+    const pageIssue = report.issues.find((issue) => issue.id === "one-page");
+    expect(pageIssue?.title).toBe("适合双页简历");
+    expect(pageIssue?.level).toBe("good");
+  });
   it("extracts useful sections from pasted English resume text", () => {
     const sections = buildResumeFromPastedText(`Jane Doe
 Email: jane@example.com

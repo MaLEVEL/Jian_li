@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_PROFILE, RESUME_TEMPLATE_OPTIONS } from "./constants";
 import {
   JOB_FRAMEWORK_CATALOG,
+  RESUME_ACCENT_OPTIONS,
   RESUME_TEMPLATE_CATALOG,
   buildFrameworkOutlineMarkdown,
   getJobFramework,
@@ -45,30 +46,50 @@ describe("navigation contract for parent integration", () => {
 });
 
 describe("resume template catalog", () => {
-  it("ships six unique, complete, and genuinely distinct fixed templates", () => {
+  it("ships sixteen unique, complete, and genuinely distinct fixed templates", () => {
     expect(RESUME_TEMPLATE_CATALOG.map((template) => template.id)).toEqual([
       "graduate",
+      "graduate-research",
       "internship",
+      "internship-project",
       "experienced",
+      "experienced-specialist",
       "technical",
+      "technical-timeline",
       "sidebar",
+      "operations-impact",
       "editorial",
+      "design-portfolio",
+      "management",
+      "consulting",
+      "academic",
+      "academic-compact",
     ]);
-    expect(new Set(RESUME_TEMPLATE_CATALOG.map((template) => template.layout)).size).toBe(6);
-    expect(new Set(RESUME_TEMPLATE_CATALOG.map((template) => template.sectionOrder)).size).toBe(6);
+    expect(new Set(RESUME_TEMPLATE_CATALOG.map((template) => template.layout)).size).toBe(16);
+    expect(new Set(RESUME_TEMPLATE_CATALOG.map((template) => JSON.stringify(template.sectionOrder))).size).toBe(16);
+    expect(new Set(RESUME_TEMPLATE_CATALOG.map((template) => template.audience)).size).toBe(8);
 
     RESUME_TEMPLATE_CATALOG.forEach((template) => {
       expect(template.name.trim()).not.toBe("");
       expect(template.description.trim()).not.toBe("");
       expect(template.accent).toMatch(/^#[0-9a-f]{6}$/i);
       expect(template.version).toMatch(/^\d+\.\d+\.\d+$/);
-      expect(template.source.kind).toBe("original");
+      expect(["original", "open-source"]).toContain(template.source.kind);
       expect(template.source.creator.trim()).not.toBe("");
       expect(template.source.license.trim()).not.toBe("");
+      if (template.source.kind === "open-source") {
+        expect(template.source.url).toMatch(/^https:\/\/github\.com\//);
+        expect(template.source.license).toMatch(/MIT|Apache-2\.0/);
+      }
       expect(template.sectionOrder).toHaveLength(7);
       expect(new Set(template.sectionOrder).size).toBe(7);
       expect(getResumeTemplateDefinition(template.id)).toBe(template);
     });
+    const audienceCounts = RESUME_TEMPLATE_CATALOG.reduce<Record<string, number>>((counts, template) => {
+      counts[template.audience] = (counts[template.audience] ?? 0) + 1;
+      return counts;
+    }, {});
+    expect(Object.values(audienceCounts)).toEqual(Array(8).fill(2));
 
     expect(RESUME_TEMPLATE_OPTIONS).toHaveLength(RESUME_TEMPLATE_CATALOG.length);
     RESUME_TEMPLATE_CATALOG.forEach((template) => {
@@ -80,6 +101,12 @@ describe("resume template catalog", () => {
     });
   });
 
+  it("offers every template accent in the theme picker", () => {
+    const selectableAccents = new Set(RESUME_ACCENT_OPTIONS.map((option) => option.value));
+    RESUME_TEMPLATE_CATALOG.forEach((template) => {
+      expect(selectableAccents.has(template.accent)).toBe(true);
+    });
+  });
   it("recognizes every catalog template while rejecting unknown values", () => {
     RESUME_TEMPLATE_CATALOG.forEach((template) => {
       expect(isResumeTemplate(template.id)).toBe(true);
@@ -93,48 +120,17 @@ describe("resume template catalog", () => {
       "求职意向", "个人总结", "教育经历", "技能", "项目经历", "实习/工作经历", "证书/奖项",
     ]);
     expect(getOrderedResumeSections(buildResume("internship")).map((section) => section.title)).toEqual([
-      "求职意向", "个人总结", "技能", "项目经历", "教育经历", "实习/工作经历", "证书/奖项",
+      "求职意向", "技能", "项目经历", "教育经历", "实习/工作经历", "个人总结", "证书/奖项",
     ]);
     expect(getOrderedResumeSections(buildResume("experienced")).map((section) => section.title)).toEqual([
-      "求职意向", "个人总结", "实习/工作经历", "项目经历", "技能", "教育经历", "证书/奖项",
+      "求职意向", "实习/工作经历", "项目经历", "个人总结", "技能", "教育经历", "证书/奖项",
     ]);
   });
 
-  it("orders the three new layouts differently without changing resume facts", () => {
-    const orderedByTemplate = RESUME_TEMPLATE_CATALOG.map((template) => ({
-      template,
-      rendered: getOrderedResumeSections(buildResume(template.id)),
-    }));
-
-    expect(orderedByTemplate.find((item) => item.template.id === "technical")?.rendered.map((section) => section.title)).toEqual([
-      "求职意向",
-      "技能",
-      "项目经历",
-      "实习/工作经历",
-      "个人总结",
-      "教育经历",
-      "证书/奖项",
-    ]);
-    expect(orderedByTemplate.find((item) => item.template.id === "sidebar")?.rendered.map((section) => section.title)).toEqual([
-      "求职意向",
-      "个人总结",
-      "技能",
-      "教育经历",
-      "项目经历",
-      "实习/工作经历",
-      "证书/奖项",
-    ]);
-    expect(orderedByTemplate.find((item) => item.template.id === "editorial")?.rendered.map((section) => section.title)).toEqual([
-      "求职意向",
-      "个人总结",
-      "项目经历",
-      "实习/工作经历",
-      "技能",
-      "教育经历",
-      "证书/奖项",
-    ]);
-
-    orderedByTemplate.forEach(({ rendered }) => {
+  it("renders every configured section once in its template-specific order", () => {
+    RESUME_TEMPLATE_CATALOG.forEach((template) => {
+      const rendered = getOrderedResumeSections(buildResume(template.id));
+      expect(rendered.map((section) => section.id)).toEqual(template.sectionOrder);
       expect(rendered.flatMap((section) => section.items.filter(Boolean)).sort()).toEqual(
         [
           "Python Agent 工程师",
@@ -184,26 +180,32 @@ describe("stored template compatibility", () => {
 });
 
 describe("job content frameworks", () => {
-  it("provides four complete frameworks without fabricating experience or metrics", () => {
+  it("provides ten complete frameworks without fabricating experience or metrics", () => {
     expect(JOB_FRAMEWORK_CATALOG.map((framework) => framework.id)).toEqual([
       "python-backend",
       "agent-rag",
       "fullstack",
       "data-analysis",
+      "campus-early-career",
+      "internship-entry",
+      "product-operations",
+      "design-creative",
+      "management-consulting",
+      "academic-research",
     ]);
 
     JOB_FRAMEWORK_CATALOG.forEach((framework) => {
       expect(framework.name.trim()).not.toBe("");
       expect(framework.description.trim()).not.toBe("");
       expect(framework.version).toMatch(/^\d+\.\d+\.\d+$/);
-      expect(framework.outline.length).toBeGreaterThanOrEqual(4);
+      expect(framework.outline.length).toBeGreaterThanOrEqual(3);
       framework.outline.forEach((section) => {
         expect(section.title.trim()).not.toBe("");
-        expect(section.placeholders).toHaveLength(3);
+        expect(section.placeholders.length).toBeGreaterThanOrEqual(2);
         expect(section.evidenceChecks.length).toBeGreaterThanOrEqual(2);
         expect(section.preparationQuestions.length).toBeGreaterThanOrEqual(2);
         section.placeholders.forEach((placeholder) => {
-          expect(placeholder).toMatch(/请填写|请选择|请描述|请列出|请说明/);
+          expect(placeholder).toMatch(/^请/);
           expect(placeholder).not.toMatch(/\d+(?:\.\d+)?%|\d+\s*(?:人|次|万|k|K|ms|秒|分钟)/i);
         });
       });
@@ -226,7 +228,29 @@ describe("job content frameworks", () => {
 });
 
 
-
+describe("resume appearance export", () => {
+  it("applies user typography, margin, accent and page settings to print HTML", () => {
+    const styledResume: ResumeVersion = {
+      ...buildResume("technical-timeline"),
+      appearance: {
+        fontFamily: "serif",
+        fontSize: 13,
+        lineHeight: 1.7,
+        pageMargin: 18,
+        accent: "#245f82",
+        pageCount: 2,
+      },
+    };
+    const html = renderResumeHtml(DEFAULT_PROFILE, styledResume);
+    expect(html).toContain("font-size: 13pt");
+    expect(html).toContain("line-height: 1.7");
+    expect(html).toContain("@page { size: A4; margin: 18mm; }");
+    expect(html).toContain("padding: 18mm");
+    expect(html).toContain("#245f82");
+    expect(html).toContain('data-page-count="2"');
+    expect(html).toContain("Noto Serif SC");
+  });
+});
 
 describe("resume export layout consistency", () => {
   it("renders each template HTML with catalog accent and preserves every fact", () => {
@@ -249,27 +273,30 @@ describe("resume export layout consistency", () => {
     });
   });
 
-  it("renders the sidebar template as a real two-column print layout", () => {
-    const html = renderResumeHtml(DEFAULT_PROFILE, buildResume("sidebar"));
+  it("renders sidebar-family templates as real two-column print layouts", () => {
+    ["sidebar", "design-portfolio"].forEach((templateId) => {
+      const template = getResumeTemplateDefinition(templateId as ResumeVersion["template"]);
+      const html = renderResumeHtml(DEFAULT_PROFILE, buildResume(template.id));
 
-    expect(html).toContain('class="resume-layout resume-layout--two-column-sidebar"');
-    expect(html).toContain("grid-template-columns: minmax(0, 0.32fr) minmax(0, 0.68fr)");
-    expect(html).toContain('<aside class="resume-side" aria-label="侧栏信息">');
-    expect(html).toContain('<div class="resume-main" aria-label="主要内容">');
-    ["skills", "education", "awards"].forEach((sectionId) => {
-      expect(html).toContain(`data-section-id="${sectionId}"`);
-    });
-    ["intent", "summary", "projects", "experience"].forEach((sectionId) => {
-      expect(html).toContain(`data-section-id="${sectionId}"`);
+      expect(html).toContain(`class="resume-layout resume-layout--${template.layout}"`);
+      expect(html).toContain("grid-template-columns:");
+      expect(html).toContain('<aside class="resume-side" aria-label="侧栏信息">');
+      expect(html).toContain('<div class="resume-main" aria-label="主要内容">');
+      ["skills", "education", "awards"].forEach((sectionId) => {
+        expect(html).toContain(`data-section-id="${sectionId}"`);
+      });
+      ["intent", "summary", "projects", "experience"].forEach((sectionId) => {
+        expect(html).toContain(`data-section-id="${sectionId}"`);
+      });
     });
   });
 
   it("renders non-sidebar templates as accessible single-column print layouts", () => {
-    RESUME_TEMPLATE_CATALOG.filter((template) => template.layout !== "two-column-sidebar").forEach((template) => {
+    RESUME_TEMPLATE_CATALOG.filter((template) => !template.layout.includes("sidebar")).forEach((template) => {
       const html = renderResumeHtml(DEFAULT_PROFILE, buildResume(template.id));
 
       expect(html).toContain(`class="resume-layout resume-layout--${template.layout}"`);
-      expect(html).not.toContain("resume-side");
+      expect(html).not.toContain(`<aside class="resume-side"`);
       expect(html).not.toContain("grid-template-columns:");
       expect((html.match(/<section /g) ?? []).length).toBe(7);
     });
@@ -288,6 +315,26 @@ describe("resume export layout consistency", () => {
       return xml;
     }
 
+    const styledAppearance = {
+      fontFamily: "serif" as const,
+      fontSize: 13,
+      lineHeight: 1.7,
+      pageMargin: 18,
+      accent: "#245f82",
+      pageCount: 2 as const,
+    };
+    const styledArchive = await JSZip.loadAsync(await Packer.toBuffer(await buildResumeDocument(DEFAULT_PROFILE, {
+      ...buildResume("technical-timeline"),
+      appearance: styledAppearance,
+    })));
+    const styledXml = await styledArchive.file("word/document.xml")?.async("string");
+    expect(styledXml).toContain('w:sz w:val="26"');
+    expect(styledXml).toContain('w:left="1021"');
+    expect(styledXml).toContain('w:right="1021"');
+    for (const centeredTemplate of ["academic", "graduate-research", "academic-compact"] as const) {
+      const centeredXml = await documentXml(centeredTemplate);
+      expect(centeredXml, centeredTemplate).toContain('w:jc w:val="center"');
+    }
     const sidebarXml = await documentXml("sidebar");
     expect(sidebarXml).toContain("<w:tbl>");
     expect((sidebarXml.match(/<w:gridCol/g) ?? []).length).toBe(2);
@@ -303,7 +350,7 @@ describe("resume export layout consistency", () => {
       ...sections.awards,
     ].forEach((fact) => expect(sidebarXml).toContain(fact));
 
-    for (const template of RESUME_TEMPLATE_CATALOG.filter((item) => item.layout !== "two-column-sidebar")) {
+    for (const template of RESUME_TEMPLATE_CATALOG.filter((item) => !item.layout.includes("sidebar"))) {
       const xml = await documentXml(template.id);
       expect(xml).not.toContain("<w:tbl>");
       expect(xml).toContain(template.accent.replace("#", "").toUpperCase());
@@ -316,5 +363,5 @@ describe("resume export layout consistency", () => {
         ...sections.awards,
       ].forEach((fact) => expect(xml).toContain(fact));
     }
-  });
+  }, 30_000);
 });

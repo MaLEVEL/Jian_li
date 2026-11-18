@@ -25,7 +25,7 @@ import {
   Plus,
 } from "lucide-react";
 import { ChangeEvent, CSSProperties, FormEvent, useMemo, useState } from "react";
-import { getResumeTemplateDefinition } from "./templateCatalog";
+import { RESUME_ACCENT_OPTIONS, RESUME_FONT_OPTIONS, getResumeFontOption, getResumeTemplateDefinition, isSidebarResumeLayout } from "./templateCatalog";
 import { RESUME_TEMPLATE_OPTIONS, STATUS_OPTIONS } from "./constants";
 import { EmptyState, Field, MetricCard, PanelTitle, TextArea } from "./components";
 import {
@@ -33,6 +33,7 @@ import {
   getOrderedResumeSections,
   getResumeIdentity,
   inspectResumeQuality,
+  resolveResumeAppearance,
   splitLines,
   splitSkills,
 } from "./resumeLogic";
@@ -44,6 +45,7 @@ import type {
   MatchReport,
   MatchPreview,
   ResumeContentPatch,
+  ResumeAppearance,
   ResumeIdentity,
   ResumeImportDraft,
   ResumeQualityReport,
@@ -339,6 +341,11 @@ export function BuilderView({
   const selectedTemplateOption = selectedResume
     ? RESUME_TEMPLATE_OPTIONS.find((option) => option.value === selectedResume.template)
     : undefined;
+  const selectedAppearance = selectedResume ? resolveResumeAppearance(selectedResume) : undefined;
+  const updateAppearance = (patch: Partial<ResumeAppearance>) => {
+    if (!selectedResume || !selectedAppearance) return;
+    onUpdateResume(selectedResume.id, { appearance: { ...selectedAppearance, ...patch } });
+  };
   const [activePane, setActivePane] = useState<"editor" | "preview">("editor");
   const [managerOpen, setManagerOpen] = useState(!selectedResume);
   const switchToEditor = () => { setActivePane("editor"); setManagerOpen(false); };
@@ -364,6 +371,47 @@ export function BuilderView({
           </select>
           <small>{selectedTemplateOption?.description ?? "先选择版本，再挑选适合的版式"}</small>
         </label>
+        <details className="resume-appearance">
+          <summary>
+            <span>排版与主题</span>
+            <small>{selectedAppearance ? `${selectedAppearance.pageCount === 1 ? "单页" : "双页"} · ${selectedAppearance.fontSize}pt · ${selectedAppearance.pageMargin}mm 边距` : "先选择简历版本"}</small>
+          </summary>
+          {selectedAppearance ? (
+            <div className="resume-appearance__grid">
+              <label>
+                <span>页面容量</span>
+                <select aria-label="页面容量" value={selectedAppearance.pageCount} onChange={(event) => updateAppearance({ pageCount: Number(event.currentTarget.value) === 2 ? 2 : 1 })}>
+                  <option value="1">单页优先</option>
+                  <option value="2">双页舒展</option>
+                </select>
+              </label>
+              <label>
+                <span>字体</span>
+                <select aria-label="字体" value={selectedAppearance.fontFamily} onChange={(event) => updateAppearance({ fontFamily: event.currentTarget.value as ResumeAppearance["fontFamily"] })}>
+                  {RESUME_FONT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+              </label>
+              <label>
+                <span>字号</span>
+                <input aria-label="字号" type="number" min="10.5" max="16" step="0.5" value={selectedAppearance.fontSize} onChange={(event) => updateAppearance({ fontSize: Number(event.currentTarget.value) || selectedAppearance.fontSize })} />
+              </label>
+              <label>
+                <span>行距</span>
+                <input aria-label="行距" type="number" min="1.25" max="2" step="0.05" value={selectedAppearance.lineHeight} onChange={(event) => updateAppearance({ lineHeight: Number(event.currentTarget.value) || selectedAppearance.lineHeight })} />
+              </label>
+              <label>
+                <span>页边距</span>
+                <input aria-label="页边距" type="number" min="12" max="24" step="1" value={selectedAppearance.pageMargin} onChange={(event) => updateAppearance({ pageMargin: Number(event.currentTarget.value) || selectedAppearance.pageMargin })} />
+              </label>
+              <label>
+                <span>主题色</span>
+                <select aria-label="主题色" value={selectedAppearance.accent ?? getResumeTemplateDefinition(selectedResume?.template ?? "graduate").accent} onChange={(event) => updateAppearance({ accent: event.currentTarget.value })}>
+                  {RESUME_ACCENT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+              </label>
+            </div>
+          ) : null}
+        </details>
         <div className="builder-controls__actions">
           <button
             className="secondary-button"
@@ -1150,26 +1198,49 @@ function ResumePaper({ profile, resume }: { profile: CandidateProfile; resume: R
   const identity = getResumeIdentity(profile, resume);
   const contact = [identity.phone, identity.email, identity.location].filter(Boolean).join(" · ");
   const sections = getOrderedResumeSections(resume);
+  const template = getResumeTemplateDefinition(resume.template);
+  const appearance = resolveResumeAppearance(resume);
+  const font = getResumeFontOption(appearance.fontFamily);
   const sidebarIds = new Set(["skills", "education", "awards"]);
-  const renderSection = (section: (typeof sections)[number]) => <ResumeSection items={section.items} key={section.id} title={section.title} />;
+  const renderSection = (section: (typeof sections)[number]) => (
+    <ResumeSection id={section.id} items={section.items} key={section.id} title={section.title} />
+  );
   return (
-    <article className={`resume-paper resume-paper--${resume.template}`} style={{ "--resume-accent": getResumeTemplateDefinition(resume.template).accent } as CSSProperties}>
+    <article
+      className={`resume-paper resume-paper--${resume.template}`}
+      data-layout={template.layout}
+      data-page-count={appearance.pageCount}
+      style={{
+        "--resume-accent": appearance.accent ?? template.accent,
+        "--resume-font-family": font.stack,
+        "--resume-font-size": `${appearance.fontSize}pt`,
+        "--resume-line-height": `${appearance.lineHeight}`,
+        "--resume-margin": `${appearance.pageMargin}mm`,
+        "--resume-page-min-height": appearance.pageCount === 1 ? "297mm" : "594mm",
+      } as CSSProperties}
+    >
       <header>
         <h2>{identity.name || "未命名候选人"}</h2>
         {contact ? <p>{contact}</p> : null}
       </header>
-      {resume.template === "sidebar" ? <><div className="resume-sidebar">{sections.filter((section) => sidebarIds.has(section.id)).map(renderSection)}</div><div className="resume-main">{sections.filter((section) => !sidebarIds.has(section.id)).map(renderSection)}</div></> : sections.map(renderSection)}
+      {isSidebarResumeLayout(template.layout) ? (
+        <>
+          <div className="resume-sidebar">{sections.filter((section) => sidebarIds.has(section.id)).map(renderSection)}</div>
+          <div className="resume-main">{sections.filter((section) => !sidebarIds.has(section.id)).map(renderSection)}</div>
+        </>
+      ) : (
+        sections.map(renderSection)
+      )}
     </article>
   );
 }
-
-function ResumeSection({ title, items }: { title: string; items: string[] }) {
+function ResumeSection({ id, title, items }: { id: string; title: string; items: string[] }) {
   const visibleItems = items.filter(Boolean);
   if (!visibleItems.length) {
     return null;
   }
   return (
-    <section>
+    <section data-section-id={id}>
       <h3>{title}</h3>
       {visibleItems.length === 1 ? (
         <p>{visibleItems[0]}</p>

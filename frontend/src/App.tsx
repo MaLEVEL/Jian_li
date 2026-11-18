@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import { DEFAULT_PROFILE, EMPTY_JOB, SAMPLE_FRONTEND_JOB } from "./constants";
+import { getResumeTemplateDefinition } from "./templateCatalog";
 import { NavButton, StatusMessage } from "./components";
 import type { StatusMessageType } from "./components";
 import {
@@ -604,6 +605,7 @@ export default function App() {
     const plainText = renderResumeText(buildResumeRenderProfile(profile, nextResume), sections);
     const unsupportedClaims = findUnsupportedClaims(profile, plainText);
     const hasLinkedApplications = applications.some((application) => application.resumeId === id);
+    const contentChanged = Boolean(patch.identity || patch.targetRole !== undefined || patch.sections);
 
     setResumes((current) =>
       current.map((resume) =>
@@ -614,7 +616,7 @@ export default function App() {
               sections,
               plainText,
               unsupportedClaims,
-              reviewed: false,
+              reviewed: contentChanged ? false : resume.reviewed,
               updatedAt: now,
             }
           : resume,
@@ -694,11 +696,21 @@ export default function App() {
 
   function updateResumeTemplate(id: string, template: ResumeTemplate) {
     setResumes((current) =>
-      current.map((resume) =>
-        resume.id === id ? { ...resume, template, updatedAt: new Date().toISOString() } : resume,
-      ),
+      current.map((resume) => {
+        if (resume.id !== id) return resume;
+        const currentAccent = getResumeTemplateDefinition(resume.template).accent;
+        const nextAccent = getResumeTemplateDefinition(template).accent;
+        return {
+          ...resume,
+          template,
+          appearance: resume.appearance
+            ? { ...resume.appearance, accent: resume.appearance.accent === currentAccent ? nextAccent : resume.appearance.accent }
+            : undefined,
+          updatedAt: new Date().toISOString(),
+        };
+      }),
     );
-    setMessage("简历模板已切换，导出前请重新检查排版。");
+    setMessage("简历模板已切换，正文与个人信息保持不变；导出前请检查排版。");
   }
 
   function deleteResume(id: string) {

@@ -73,6 +73,45 @@ describe("storage normalization", () => {
     expect(restored.applications[0].resumeTitle).toBe("Frontend base");
   });
 
+  it("restores safe appearance defaults and clamps invalid typography settings", () => {
+    const restored = normalizeStoredState({
+      version: STORAGE_VERSION,
+      profile: DEFAULT_PROFILE,
+      resumes: [
+        {
+          id: "resume-styled",
+          title: "Styled resume",
+          source: "generated",
+          template: "academic",
+          targetRole: "Researcher",
+          sections,
+          plainText: "React TypeScript Vite",
+          unsupportedClaims: [],
+          reviewed: false,
+          appearance: {
+            fontFamily: "serif",
+            fontSize: 99,
+            lineHeight: 0.2,
+            pageMargin: 80,
+            pageCount: 2,
+            accent: "#123456",
+          },
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+      applications: [],
+    });
+
+    expect(restored.resumes[0].appearance).toMatchObject({
+      fontFamily: "serif",
+      fontSize: 16,
+      lineHeight: 1.25,
+      pageMargin: 24,
+      pageCount: 2,
+      accent: "#123456",
+    });
+  });
   it("keeps optimized resumes but clears missing parent links", () => {
     const restored = normalizeStoredState({
       version: STORAGE_VERSION,
