@@ -16,7 +16,7 @@ export function NavButton({
 }) {
   const label = typeof children === "string" ? children : undefined;
   return (
-    <button className={`nav-button ${active ? "nav-button--active" : ""}`} type="button" onClick={onClick} aria-label={label}>
+    <button className={`nav-button ${active ? "nav-button--active" : ""}`} type="button" onClick={onClick} aria-label={label} aria-current={active ? "page" : undefined}>
       {icon}
       <span>{children}</span>
     </button>

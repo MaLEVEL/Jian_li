@@ -8,6 +8,9 @@ import type {
   Material,
   MaterialDraft,
   ParsedResume,
+  SkillDefinition,
+  SkillRunRequest,
+  SkillRunResult,
 } from "./agentTypes";
 
 export class AgentApiError extends Error {
@@ -144,7 +147,76 @@ export function createAgentApi({ baseUrl }: AgentApiOptions = {}) {
     async getHistory(id: string) {
       return requestJson<Analysis>(`/api/history/${encodeURIComponent(id)}`, "GET");
     },
+    async listSkills() {
+      return requestJson<SkillDefinition[]>("/api/skills", "GET");
+    },
+    async runSkill(skillId: string, request: SkillRunRequest) {
+      return requestJson<SkillRunResult>(`/api/skills/${encodeURIComponent(skillId)}/run`, "POST", request);
+    },
+    async listSkillRuns(analysisId: string) {
+      return requestJson<SkillRunResult[]>(
+        `/api/skill-runs?analysis_id=${encodeURIComponent(analysisId)}`,
+        "GET",
+      );
+    },
+    async getSkillRun(id: string) {
+      return requestJson<SkillRunResult>(`/api/skill-runs/${encodeURIComponent(id)}`, "GET");
+    },
   };
+}
+
+function skillModeLabel(mode: string) {
+  const labels: Record<string, string> = {
+    online: "在线模型",
+    ai: "在线模型",
+    degraded: "降级模式",
+    offline: "离线规则",
+  };
+  return labels[mode] ?? mode;
+}
+
+function quoteMarkdown(text: string) {
+  return text.trim().split(/\r?\n/).map((line) => `> ${line}`.trimEnd()).join("\n");
+}
+
+export function buildSkillRunMarkdown(result: SkillRunResult) {
+  const lines: string[] = [
+    `# ${result.skill_name}：${result.title}`,
+    "",
+    "## 运行信息",
+    "",
+    `- 技能版本：${result.skill_version}`,
+    `- 模式：${skillModeLabel(result.mode)}（${result.mode}）`,
+    `- 模型：${result.model || "未返回"}`,
+    `- 耗时：${result.duration_ms} ms`,
+    `- Token：${result.usage.prompt_tokens} 输入 / ${result.usage.completion_tokens} 输出 / ${result.usage.total_tokens} 总计`,
+    `- 生成时间：${result.created_at}`,
+    "",
+  ];
+
+  if (result.warnings.length) {
+    lines.push("## 警告", "");
+    result.warnings.forEach((warning) => lines.push(`- ${warning}`));
+    lines.push("");
+  }
+
+  result.sections.forEach((section) => {
+    lines.push(`## ${section.title}`, "");
+    section.items.forEach((item) => {
+      lines.push(`### ${item.heading}`, "", quoteMarkdown(item.content), "");
+      if (item.source_ids.length) {
+        lines.push(`- 来源：${item.source_ids.join("、")}`);
+      }
+      lines.push(`- 类型：${item.kind}`, `- 状态：${item.review_required ? "需人工核实" : item.kind === "fact" ? "来源摘录" : "生成练习，需自行验证"}`, "");
+    });
+  });
+
+  lines.push("## 来源", "");
+  result.sources.forEach((source) => {
+    lines.push(`### ${source.title}`, "", `- ID：${source.id}`, "", "```text", source.content, "```", "");
+  });
+  lines.push("> 业务技能结果仅供人工审阅，不会自动写入简历。");
+  return lines.join("\n");
 }
 
 export type AgentApiClient = ReturnType<typeof createAgentApi>;

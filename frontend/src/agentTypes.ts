@@ -124,3 +124,52 @@ export interface BatchAnalysisResponse {
   results: Analysis[];
   errors: BatchAnalysisError[];
 }
+
+export interface SkillDefinition {
+  id: string;
+  name: string;
+  description: string;
+  version: string;
+}
+
+export interface SkillRunRequest {
+  analysis_id: string;
+}
+
+export type SkillRunItemKind = "fact" | "proposal" | "study" | "question";
+
+export interface SkillRunItem {
+  heading: string;
+  content: string;
+  kind: SkillRunItemKind;
+  source_ids: string[];
+  review_required: boolean;
+}
+
+export interface SkillRunSection {
+  title: string;
+  items: SkillRunItem[];
+}
+
+export interface SkillRunSource {
+  id: string;
+  title: string;
+  content: string;
+}
+
+export interface SkillRunResult {
+  id: string;
+  skill_id: string;
+  skill_name: string;
+  skill_version: string;
+  analysis_id: string;
+  title: string;
+  mode: string;
+  model: string;
+  warnings: string[];
+  duration_ms: number;
+  usage: AgentTokenUsage;
+  created_at: string;
+  sections: SkillRunSection[];
+  sources: SkillRunSource[];
+}

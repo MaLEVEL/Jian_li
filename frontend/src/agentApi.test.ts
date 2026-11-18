@@ -2,10 +2,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   AgentApiError,
   agentApi,
+  buildSkillRunMarkdown,
   createAgentApi,
   parseBatchJobs,
 } from "./agentApi";
-import type { AgentHealth } from "./agentTypes";
+import type { AgentHealth, SkillRunResult } from "./agentTypes";
 
 const health: AgentHealth = {
   status: "ok",
@@ -67,6 +68,81 @@ describe("agent API client", () => {
     expect(init.method).toBe("POST");
     expect(init.body).toBeInstanceOf(FormData);
     expect(init.headers).not.toHaveProperty("Content-Type");
+  });
+});
+
+describe("business skill API client", () => {
+  const skillRun: SkillRunResult = {
+    id: "run-1",
+    skill_id: "resume-tailor",
+    skill_name: "简历定制改写",
+    skill_version: "1.0.0",
+    analysis_id: "analysis-1",
+    title: "星河科技 · Python Agent 工程师",
+    mode: "online",
+    model: "glm-4",
+    warnings: ["改写建议需人工核实"],
+    duration_ms: 1800,
+    usage: { prompt_tokens: 1200, completion_tokens: 300, total_tokens: 1500 },
+    created_at: "2026-11-18T10:00:00.000Z",
+    sections: [
+      {
+        title: "定制建议",
+        items: [
+          {
+            heading: "项目经历改写",
+            content: "保留真实职责，并按 JD 顺序重组表达。",
+            kind: "proposal",
+            source_ids: ["resume", "material-1"],
+            review_required: true,
+          },
+        ],
+      },
+    ],
+    sources: [
+      { id: "resume", title: "简历原文", content: "负责 FastAPI 接口开发" },
+      { id: "material-1", title: "项目素材", content: "完成用户模块接口联调" },
+    ],
+  };
+
+  it("calls the controlled skill registry, run, and history endpoints", async () => {
+    const fetchMock = mockFetch(Response.json([]));
+    fetchMock.mockResolvedValueOnce(Response.json(skillRun));
+    fetchMock.mockResolvedValueOnce(Response.json([skillRun]));
+    fetchMock.mockResolvedValueOnce(Response.json(skillRun));
+    const api = createAgentApi({ baseUrl: "http://localhost:8000" });
+
+    await api.listSkills();
+    await api.runSkill("resume-tailor", { analysis_id: "analysis-1" });
+    await api.listSkillRuns("analysis-1");
+    await api.getSkillRun("run-1");
+
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      "http://localhost:8000/api/skills",
+      "http://localhost:8000/api/skills/resume-tailor/run",
+      "http://localhost:8000/api/skill-runs?analysis_id=analysis-1",
+      "http://localhost:8000/api/skill-runs/run-1",
+    ]);
+    expect(fetchMock.mock.calls[1][1]).toMatchObject({
+      method: "POST",
+      body: JSON.stringify({ analysis_id: "analysis-1" }),
+    });
+  });
+
+  it("renders a skill result as reviewable Markdown with metadata and sources", () => {
+    const markdown = buildSkillRunMarkdown(skillRun);
+
+    expect(markdown).toContain("# 简历定制改写：星河科技 · Python Agent 工程师");
+    expect(markdown).toContain("- 模式：在线模型（online）");
+    expect(markdown).toContain("- Token：1200 输入 / 300 输出 / 1500 总计");
+    expect(markdown).toContain("## 定制建议");
+    expect(markdown).toContain("### 项目经历改写");
+    expect(markdown).toContain("> 保留真实职责，并按 JD 顺序重组表达。");
+    expect(markdown).toContain("- 来源：resume、material-1");
+    expect(markdown).toContain("- 状态：需人工核实");
+    expect(markdown).toContain("## 来源");
+    expect(markdown).toContain("### 简历原文");
+    expect(markdown).toContain("```text\n负责 FastAPI 接口开发\n```");
   });
 });
 

@@ -1,0 +1,368 @@
+.business-skills {
+  display: grid;
+  gap: 13px;
+}
+
+.business-skills__intro,
+.business-skills__loading {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.business-skills__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.business-skill-card {
+  display: grid;
+  align-content: start;
+  gap: 9px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.business-skill-card > div {
+  display: grid;
+  gap: 3px;
+}
+
+.business-skill-card strong {
+  color: var(--ink);
+}
+
+.business-skill-card span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.business-skill-card p {
+  max-width: 70ch;
+  margin: 0;
+  color: #334037;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.business-skill-card .secondary-button {
+  justify-self: start;
+}
+
+.business-skills__history {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper-soft);
+}
+
+.business-skills__history-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.business-skills__history-heading strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ink);
+}
+
+.business-skills__history-heading span,
+.business-skill-result__meta dd,
+.business-skill-items span,
+.business-skill-items small {
+  color: var(--muted);
+}
+
+.business-skills__history ul {
+  display: grid;
+  gap: 7px;
+  max-height: 250px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+.business-skills__history li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 76px;
+  gap: 8px;
+  align-items: center;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+.business-skills__history button {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+  padding: 7px 8px;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.business-skills__history button:hover,
+.business-skills__history li.is-active {
+  background: var(--green-soft);
+  color: var(--green-dark);
+}
+
+.business-skills__history strong,
+.business-skills__history small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.business-skills__history strong {
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.business-skills__history li > span {
+  color: var(--green-dark);
+  font-size: 12px;
+  font-weight: 900;
+  text-align: right;
+}
+
+.business-skill-result {
+  display: grid;
+  gap: 12px;
+}
+
+.business-skill-result > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #c5decf;
+  border-radius: 8px;
+  background: var(--green-soft);
+}
+
+.business-skill-result header > div:first-child {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.business-skill-result header span {
+  color: var(--green-dark);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.business-skill-result h3 {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 20px;
+}
+
+.business-skill-result__actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.business-skill-result__meta {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.business-skill-result__meta div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.business-skill-result__meta dt {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.business-skill-result__meta dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.business-skill-result__warnings {
+  display: flex;
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid #ead09a;
+  border-radius: 8px;
+  background: var(--amber-soft);
+  color: #6e4715;
+}
+
+.business-skill-result__warnings svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.business-skill-result__warnings ul {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding-left: 18px;
+  line-height: 1.5;
+}
+
+.business-skill-result > section {
+  display: grid;
+  gap: 8px;
+}
+
+.business-skill-result h4 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 16px;
+}
+
+.business-skill-items,
+.business-skill-sources {
+  display: grid;
+  gap: 8px;
+}
+
+.business-skill-items article,
+.business-skill-sources details {
+  padding: 10px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.business-skill-items article > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.business-skill-items strong {
+  color: var(--ink);
+}
+
+.business-skill-items span {
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.business-skill-items p {
+  max-width: 75ch;
+  margin: 7px 0;
+  overflow-wrap: anywhere;
+  color: #334037;
+  font-size: 13px;
+  line-height: 1.58;
+  white-space: pre-line;
+}
+
+.business-skill-items footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.business-skill-items small {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.business-skill-items em {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--amber);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.business-skill-sources summary {
+  color: var(--ink);
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.business-skill-sources small {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.business-skill-sources p {
+  max-width: 75ch;
+  margin: 7px 0 0;
+  overflow-wrap: anywhere;
+  color: #334037;
+  font-size: 13px;
+  line-height: 1.58;
+  white-space: pre-line;
+}
+
+@media (max-width: 1120px) {
+  .business-skills__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .business-skill-result__meta {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .business-skill-result > header,
+  .business-skill-result__actions {
+    display: grid;
+    align-items: stretch;
+    justify-content: stretch;
+  }
+
+  .business-skill-result__actions > .secondary-button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 520px) {
+  .business-skill-result__meta {
+    grid-template-columns: 1fr;
+  }
+}

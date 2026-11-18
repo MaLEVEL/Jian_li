@@ -1,4 +1,5 @@
-import type { ApplicationStatus, CandidateProfile, JobDraft, ResumeTemplate } from "./types";
+import type { ApplicationStatus, CandidateProfile, JobDraft } from "./types";
+import { RESUME_TEMPLATE_CATALOG } from "./templateCatalog";
 
 export const STATUS_OPTIONS: Array<{ value: ApplicationStatus; label: string }> = [
   { value: "saved", label: "收藏" },
@@ -31,11 +32,11 @@ export const SAMPLE_FRONTEND_JOB: JobDraft = {
     "4. 加分项：有 Vite、组件库、用户体验优化、数据可视化或 AI 工具类项目经验。",
 };
 
-export const RESUME_TEMPLATE_OPTIONS: Array<{ value: ResumeTemplate; label: string; description: string }> = [
-  { value: "graduate", label: "应届生模板", description: "教育、技能和项目靠前，适合校招与毕业作品展示。" },
-  { value: "internship", label: "实习模板", description: "项目和技能优先，突出可上手能力与学习速度。" },
-  { value: "experienced", label: "社招模板", description: "工作经历靠前，强调业务结果、职责范围和交付成果。" },
-];
+export const RESUME_TEMPLATE_OPTIONS = RESUME_TEMPLATE_CATALOG.map((template) => ({
+  value: template.id,
+  label: template.name,
+  description: template.description,
+}));
 
 export const DEFAULT_PROFILE: CandidateProfile = {
   name: "张同学",

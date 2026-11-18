@@ -1,4 +1,6 @@
+import type { Document as DocxDocument, Paragraph as DocxParagraph, Table as DocxTable } from "docx";
 import { KEYWORD_BANK } from "./constants";
+import { getResumeSectionOrder, getResumeTemplateDefinition } from "./templateCatalog";
 import type {
   CandidateProfile,
   InterviewQuestions,
@@ -8,7 +10,7 @@ import type {
   ResumeQualityReport,
   ResumeIdentity,
   ResumeSections,
-  ResumeTemplate,
+  ResumeSectionId,
   ResumeVersion,
 } from "./types";
 
@@ -240,7 +242,7 @@ export function extractResumeTargetRoleFromText(text: string) {
 }
 
 export function getOrderedResumeSections(resume: ResumeVersion) {
-  const sections = {
+  const sections: Record<ResumeSectionId, { title: string; items: string[] }> = {
     intent: { title: "求职意向", items: [resume.targetRole] },
     summary: { title: "个人总结", items: [resume.sections.summary] },
     skills: { title: "技能", items: [resume.sections.skills.join(" / ")] },
@@ -250,13 +252,8 @@ export function getOrderedResumeSections(resume: ResumeVersion) {
     awards: { title: "证书/奖项", items: resume.sections.awards },
   };
 
-  const order: Record<ResumeTemplate, Array<keyof typeof sections>> = {
-    graduate: ["intent", "summary", "education", "skills", "projects", "experience", "awards"],
-    internship: ["intent", "summary", "skills", "projects", "education", "experience", "awards"],
-    experienced: ["intent", "summary", "experience", "projects", "skills", "education", "awards"],
-  };
-
-  return order[resume.template].map((key) => sections[key]);
+  const order = getResumeSectionOrder(resume.template);
+  return order.map((key) => ({ id: key, ...sections[key] }));
 }
 
 export function inspectResumeQuality(resume: ResumeVersion): ResumeQualityReport {
@@ -686,27 +683,53 @@ export function optimizeResume(profile: CandidateProfile, resume: ResumeVersion,
   };
 }
 
-export async function downloadDocxFile(profile: CandidateProfile, resume: ResumeVersion) {
-  const { BorderStyle, Document, HeadingLevel, Packer, Paragraph, TextRun } = await import("docx");
+export async function buildResumeDocument(profile: CandidateProfile, resume: ResumeVersion): Promise<DocxDocument> {
+  const {
+    BorderStyle,
+    Document,
+    HeadingLevel,
+    Paragraph,
+    Table,
+    TableCell,
+    TableBorders,
+    TableLayoutType,
+    TableRow,
+    TextRun,
+    WidthType,
+  } = await import("docx");
+
+  const template = getResumeTemplateDefinition(resume.template);
+  const accent = template.accent.replace("#", "").toUpperCase();
   const identity = getResumeIdentity(profile, resume);
   const paragraph = (text: string) =>
     new Paragraph({
-      children: [new TextRun({ text, size: 22 })],
-      spacing: { after: 100 },
+      children: [new TextRun({ text, size: template.id === "editorial" ? 23 : 22 })],
+      spacing: { after: template.id === "technical" ? 70 : 100 },
     });
   const heading = (text: string) =>
     new Paragraph({
       heading: HeadingLevel.HEADING_2,
-      children: [new TextRun({ text, bold: true, color: "0D4939", size: 26 })],
+      children: [
+        new TextRun({
+          text,
+          bold: true,
+          color: accent,
+          size: template.id === "editorial" ? 28 : 26,
+          allCaps: template.id === "technical",
+        }),
+      ],
       border: {
-        bottom: {
-          color: "D7DDD7",
-          size: 6,
-          space: 1,
-          style: BorderStyle.SINGLE,
-        },
+        bottom:
+          template.id === "editorial"
+            ? undefined
+            : {
+                color: accent,
+                size: template.id === "sidebar" ? 4 : 6,
+                space: 1,
+                style: BorderStyle.SINGLE,
+              },
       },
-      spacing: { before: 220, after: 120 },
+      spacing: { before: template.id === "technical" ? 180 : 220, after: template.id === "technical" ? 90 : 120 },
     });
   const bullet = (text: string) =>
     new Paragraph({
@@ -714,15 +737,66 @@ export async function downloadDocxFile(profile: CandidateProfile, resume: Resume
       bullet: { level: 0 },
       spacing: { after: 80 },
     });
-  const section = (title: string, items: string[]) =>
-    items.filter(Boolean).length
-      ? [
-          heading(title),
-          ...(items.filter(Boolean).length === 1 ? [paragraph(items.filter(Boolean)[0])] : items.filter(Boolean).map(bullet)),
-        ]
-      : [];
+  const section = (sectionData: { title: string; items: string[] }) => {
+    const visibleItems = sectionData.items.filter(Boolean);
+    if (!visibleItems.length) {
+      return [];
+    }
+    return [
+      heading(sectionData.title),
+      ...(visibleItems.length === 1 ? [paragraph(visibleItems[0])] : visibleItems.map(bullet)),
+    ];
+  };
+
   const orderedSections = getOrderedResumeSections(resume);
-  const doc = new Document({
+  const sideSectionIds = new Set(["skills", "education", "awards"]);
+  const children: Array<DocxParagraph | DocxTable> = [
+    new Paragraph({
+      children: [
+        new TextRun({
+          text: identity.name,
+          bold: true,
+          color: accent,
+          size: template.id === "editorial" ? 40 : 34,
+        }),
+      ],
+      spacing: { after: 80 },
+    }),
+    new Paragraph({
+      children: [new TextRun({ text: formatContact(identity), color: "4C5A52", size: 20 })],
+      spacing: { after: 220 },
+    }),
+  ];
+
+  if (template.layout === "two-column-sidebar") {
+    const sideChildren = orderedSections
+      .filter((sectionData) => sideSectionIds.has(sectionData.id))
+      .flatMap(section);
+    const mainChildren = orderedSections
+      .filter((sectionData) => !sideSectionIds.has(sectionData.id))
+      .flatMap(section);
+
+    children.push(
+      new Table({
+        rows: [
+          new TableRow({
+            children: [
+              new TableCell({ children: sideChildren }),
+              new TableCell({ children: mainChildren }),
+            ],
+          }),
+        ],
+        columnWidths: [3100, 6400],
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        layout: TableLayoutType.FIXED,
+        borders: TableBorders.NONE,
+      }),
+    );
+  } else {
+    children.push(...orderedSections.flatMap(section));
+  }
+
+  return new Document({
     creator: "JobFit AI Web",
     description: "Resume generated by JobFit AI Web",
     title: resume.title,
@@ -738,20 +812,15 @@ export async function downloadDocxFile(profile: CandidateProfile, resume: Resume
             },
           },
         },
-        children: [
-          new Paragraph({
-            children: [new TextRun({ text: identity.name, bold: true, size: 34 })],
-            spacing: { after: 80 },
-          }),
-          new Paragraph({
-            children: [new TextRun({ text: formatContact(identity), color: "4C5A52", size: 20 })],
-            spacing: { after: 220 },
-          }),
-          ...orderedSections.flatMap((item) => section(item.title, item.items)),
-        ],
+        children,
       },
     ],
   });
+}
+
+export async function downloadDocxFile(profile: CandidateProfile, resume: ResumeVersion) {
+  const { Packer } = await import("docx");
+  const doc = await buildResumeDocument(profile, resume);
   const blob = await Packer.toBlob(doc);
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -761,24 +830,52 @@ export async function downloadDocxFile(profile: CandidateProfile, resume: Resume
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function renderResumeHtml(profile: CandidateProfile, resume: ResumeVersion) {
+export function renderResumeHtml(profile: CandidateProfile, resume: ResumeVersion) {
+  const template = getResumeTemplateDefinition(resume.template);
   const identity = getResumeIdentity(profile, resume);
+  const accent = template.accent;
   const escape = (value: string) =>
     value
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;");
-  const sectionHtml = (title: string, items: string[]) => {
-    const visibleItems = items.filter(Boolean);
+  const sectionHtml = (sectionData: { id: string; title: string; items: string[] }) => {
+    const visibleItems = sectionData.items.filter(Boolean);
     if (!visibleItems.length) {
       return "";
     }
-    if (visibleItems.length === 1) {
-      return `<section><h2>${escape(title)}</h2><p>${escape(visibleItems[0])}</p></section>`;
-    }
-    return `<section><h2>${escape(title)}</h2><ul>${visibleItems.map((item) => `<li>${escape(item)}</li>`).join("")}</ul></section>`;
+    const content =
+      visibleItems.length === 1
+        ? `<p>${escape(visibleItems[0])}</p>`
+        : `<ul>${visibleItems.map((item) => `<li>${escape(item)}</li>`).join("")}</ul>`;
+    return `<section data-section-id="${escape(sectionData.id)}"><h2>${escape(sectionData.title)}</h2>${content}</section>`;
   };
+
+  const orderedSections = getOrderedResumeSections(resume);
+  const sideSectionIds = new Set(["skills", "education", "awards"]);
+  const bodyHtml =
+    template.layout === "two-column-sidebar"
+      ? `<aside class="resume-side" aria-label="侧栏信息">${orderedSections
+          .filter((sectionData) => sideSectionIds.has(sectionData.id))
+          .map(sectionHtml)
+          .join("")}</aside><div class="resume-main" aria-label="主要内容">${orderedSections
+          .filter((sectionData) => !sideSectionIds.has(sectionData.id))
+          .map(sectionHtml)
+          .join("")}</div>`
+      : orderedSections.map(sectionHtml).join("");
+
+  const layoutStyles =
+    template.layout === "two-column-sidebar"
+      ? ` .resume-layout--two-column-sidebar { display: grid; grid-template-columns: minmax(0, 0.32fr) minmax(0, 0.68fr); gap: 14mm; align-items: start; } .resume-side, .resume-main { min-width: 0; } .resume-layout--two-column-sidebar h2 { border-bottom: 1px solid ${accent}; font-size: 12px; }`
+      : "";
+  const titleStyles = `
+    .resume-layout--education-first h2 { border-bottom: 1px solid ${accent}; }
+    .resume-layout--skills-first h2 { letter-spacing: 0.08em; text-transform: uppercase; }
+    .resume-layout--experience-first h2 { border-bottom: 2px solid ${accent}; }
+    .resume-layout--single-column h2 { border-bottom: 1px solid ${accent}; letter-spacing: 0.04em; }
+    .resume-layout--project-first h2 { border-bottom: 0; color: ${accent}; font-size: 16px; letter-spacing: 0.02em; }
+  `;
 
   return `<!doctype html>
 <html>
@@ -786,26 +883,28 @@ function renderResumeHtml(profile: CandidateProfile, resume: ResumeVersion) {
   <meta charset="utf-8" />
   <title>${escape(resume.title)}</title>
   <style>
-    @page { size: A4; margin: 14mm; }
+    @page { size: A4; margin: 12mm; }
     body { margin: 0; color: #151b17; font-family: "Microsoft YaHei", "Segoe UI", Arial, sans-serif; line-height: 1.45; }
-    main { max-width: 760px; margin: 0 auto; }
-    header { border-bottom: 2px solid #1f2c25; padding-bottom: 10px; margin-bottom: 12px; }
-    h1 { margin: 0; font-size: 26px; }
+    .resume-sheet { max-width: 760px; margin: 0 auto; }
+    header { border-bottom: 2px solid ${accent}; padding-bottom: 10px; margin-bottom: 12px; }
+    h1 { margin: 0; color: ${accent}; font-size: ${template.id === "editorial" ? "31px" : "26px"}; letter-spacing: ${template.id === "editorial" ? "0.02em" : "0"}; }
     .meta { margin-top: 4px; color: #4c5a52; font-size: 12px; }
-    h2 { margin: 14px 0 7px; border-bottom: 1px solid #d7ddd7; color: #0f3f31; font-size: 14px; padding-bottom: 4px; }
+    .resume-layout { display: block; }
+    h2 { margin: 14px 0 7px; border-bottom: 1px solid #d7ddd7; color: ${accent}; font-size: 14px; padding-bottom: 4px; }
     p, li { font-size: 12px; }
     p { margin: 0; }
     ul { margin: 0; padding-left: 18px; }
-    li { margin: 4px 0; }
+    li { margin: 4px 0; }${titleStyles}${layoutStyles}
+    @media print { .resume-sheet { max-width: none; } }
   </style>
 </head>
 <body>
-  <main>
+  <main class="resume-sheet" data-template-id="${escape(template.id)}" data-layout="${escape(template.layout)}">
     <header>
       <h1>${escape(identity.name)}</h1>
       <div class="meta">${escape(formatContact(identity))}</div>
     </header>
-    ${getOrderedResumeSections(resume).map((item) => sectionHtml(item.title, item.items)).join("")}
+    <div class="resume-layout resume-layout--${escape(template.layout)}">${bodyHtml}</div>
   </main>
 </body>
 </html>`;

@@ -15,6 +15,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { BusinessSkills } from "./BusinessSkills";
 import { MAX_BATCH_JOBS, agentApi, parseBatchJobs } from "../agentApi";
 import type {
   AgentHealth,
@@ -28,8 +29,15 @@ import "./AgentWorkspace.css";
 
 type ResumeSourceMode = "library" | "paste" | "upload";
 type MaterialDraftState = { title: string; content: string; tags: string };
+type BatchJobRow = { id: string; job: BatchJobInput };
 
 const emptyBatchJob: BatchJobInput = { company: "", title: "", jd_text: "" };
+let batchRowSeed = 0;
+
+function createBatchRow(job: BatchJobInput = emptyBatchJob): BatchJobRow {
+  batchRowSeed += 1;
+  return { id: `batch-row-${batchRowSeed}`, job: { ...job } };
+}
 
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error && error.message ? error.message : fallback;
@@ -189,7 +197,7 @@ export function AgentWorkspace({
   const [analysis, setAnalysis] = useState<Analysis | undefined>();
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [analysisError, setAnalysisError] = useState("");
-  const [batchJobs, setBatchJobs] = useState<BatchJobInput[]>([{ ...emptyBatchJob }]);
+  const [batchRows, setBatchRows] = useState<BatchJobRow[]>(() => [createBatchRow()]);
   const [batchImport, setBatchImport] = useState("");
   const [batchNotice, setBatchNotice] = useState("");
   const [batchError, setBatchError] = useState("");
@@ -213,8 +221,8 @@ export function AgentWorkspace({
   );
   const activeResumeText =
     resumeMode === "library" ? selectedResume?.plainText ?? "" : resumeMode === "paste" ? pastedResume : uploadedResume?.text ?? "";
-  const readyBatchJobs = batchJobs.filter(isBatchJobReady);
-  const batchInputInvalid = batchJobs.length > MAX_BATCH_JOBS || batchJobs.some((job) => !isBatchJobReady(job) && Boolean(job.company || job.title || job.jd_text));
+  const readyBatchJobs = batchRows.map((row) => row.job).filter(isBatchJobReady);
+  const batchInputInvalid = batchRows.length > MAX_BATCH_JOBS || batchRows.some(({ job }) => !isBatchJobReady(job) && Boolean(job.company || job.title || job.jd_text));
   const candidateMaterialContent = useMemo(() => (
     [
       profile.headline ? `定位：${profile.headline}` : "",
@@ -320,8 +328,8 @@ export function AgentWorkspace({
     }
   }
 
-  function updateBatchJob(index: number, patch: Partial<BatchJobInput>) {
-    setBatchJobs((current) => current.map((job, jobIndex) => jobIndex === index ? { ...job, ...patch } : job));
+  function updateBatchJob(rowId: string, patch: Partial<BatchJobInput>) {
+    setBatchRows((current) => current.map((row) => row.id === rowId ? { ...row, job: { ...row.job, ...patch } } : row));
   }
 
   function importBatchJobs() {
@@ -329,7 +337,7 @@ export function AgentWorkspace({
     setBatchNotice("");
     try {
       const parsed = parseBatchJobs(batchImport);
-      setBatchJobs(parsed);
+      setBatchRows(parsed.map((job) => createBatchRow(job)));
       setBatchNotice(`已导入 ${parsed.length} 条岗位，可先检查再运行批量分析。`);
       setBatchImport("");
     } catch (error) {
@@ -540,7 +548,7 @@ export function AgentWorkspace({
           <section className="panel" aria-label="批量岗位分析">
             <PanelTitle icon={<ListChecks size={20} />} title={`批量 JD 排序（最多 ${MAX_BATCH_JOBS} 条）`} />
             <div className="agent-batch-toolbar">
-              <button className="secondary-button compact-button" type="button" onClick={() => setBatchJobs((current) => current.length < MAX_BATCH_JOBS ? [...current, { ...emptyBatchJob }] : current)}>
+              <button className="secondary-button compact-button" type="button" onClick={() => setBatchRows((current) => current.length < MAX_BATCH_JOBS ? [...current, createBatchRow()] : current)}>
                 <Plus size={17} />添加岗位
               </button>
               <button className="secondary-button compact-button" type="button" onClick={runBatchAnalysis} disabled={batchLoading}>
@@ -552,12 +560,12 @@ export function AgentWorkspace({
             </div>
 
             <div className="agent-batch-list" aria-live="polite">
-              {batchJobs.map((job, index) => (
-                <div className="agent-batch-row" key={`${index}-${job.company}-${job.title}`}>
-                  <label>公司<input value={job.company} onChange={(event) => updateBatchJob(index, { company: event.target.value })} placeholder="公司" /></label>
-                  <label>职位<input value={job.title} onChange={(event) => updateBatchJob(index, { title: event.target.value })} placeholder="职位" /></label>
-                  <label>JD<textarea value={job.jd_text} onChange={(event) => updateBatchJob(index, { jd_text: event.target.value })} placeholder="岗位 JD" /></label>
-                  <button className="destructive-button icon-button" type="button" onClick={() => setBatchJobs((current) => current.length > 1 ? current.filter((_, rowIndex) => rowIndex !== index) : [{ ...emptyBatchJob }])} aria-label={`删除第 ${index + 1} 条岗位`}>
+              {batchRows.map(({ id: rowId, job }, index) => (
+                <div className="agent-batch-row" key={rowId}>
+                  <label>公司<input value={job.company} onChange={(event) => updateBatchJob(rowId, { company: event.target.value })} placeholder="公司" /></label>
+                  <label>职位<input value={job.title} onChange={(event) => updateBatchJob(rowId, { title: event.target.value })} placeholder="职位" /></label>
+                  <label>JD<textarea value={job.jd_text} onChange={(event) => updateBatchJob(rowId, { jd_text: event.target.value })} placeholder="岗位 JD" /></label>
+                  <button className="destructive-button icon-button" type="button" onClick={() => setBatchRows((current) => current.length > 1 ? current.filter((row) => row.id !== rowId) : [createBatchRow()])} aria-label={`删除第 ${index + 1} 条岗位`}>
                     <Trash2 size={17} />
                   </button>
                 </div>
@@ -637,7 +645,12 @@ export function AgentWorkspace({
         <div className="stack">
           <section className="panel agent-report-panel" aria-label="Agent 分析报告">
             <PanelTitle icon={<CheckCircle2 size={20} />} title="分析报告" />
-            {report ? <AnalysisReport analysis={report} /> : (
+            {report ? (
+              <>
+                <AnalysisReport analysis={report} />
+                <BusinessSkills analysis={report} key={report.id} />
+              </>
+            ) : (
               <EmptyState title="等待 Agent 分析" text="运行单岗位分析、批量分析或打开历史记录后，这里会显示评分依据、证据引用、执行轨迹和 Token 用量。" />
             )}
           </section>

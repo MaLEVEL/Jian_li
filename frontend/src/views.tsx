@@ -17,8 +17,11 @@ import {
   Trash2,
   Upload,
   User,
+  ArrowUpRight,
+  Shapes,
 } from "lucide-react";
-import { ChangeEvent, FormEvent, useMemo, useState } from "react";
+import { ChangeEvent, CSSProperties, FormEvent, useMemo, useState } from "react";
+import { getResumeTemplateDefinition } from "./templateCatalog";
 import { RESUME_TEMPLATE_OPTIONS, STATUS_OPTIONS } from "./constants";
 import { EmptyState, Field, MetricCard, PanelTitle, TextArea } from "./components";
 import {
@@ -92,26 +95,36 @@ export function WorkspaceView({
     <div className="stack">
       <section className="hero-panel">
         <div>
-          <p className="eyebrow">Resume Workflow</p>
-          <h2>把简历版本、JD 匹配和投递跟进串成一条线。</h2>
+          <h2>把经历写成底气，<br />向更远的地方出发。</h2>
           <p>
-            数据只保存在当前浏览器。先整理经历，再生成或导入简历，最后围绕岗位做匹配和跟进。
+            从一件做过的小事开始，把它写清楚，再带着它去遇见下一次机会。
           </p>
+          <div className="hero-inline-actions"><button className="primary-button" type="button" onClick={() => onGo(hasResume ? "builder" : "profile")}>{hasResume ? "继续写我的简历" : "整理我的经历"}<ArrowUpRight size={18} /></button><button className="ghost-button" type="button" onClick={() => onGo("agent")}>分析目标岗位<ArrowUpRight size={17} /></button></div>
         </div>
-        <div className="hero-actions hero-actions--single">
-          <button className="primary-button" type="button" onClick={primaryAction.onClick}>
-            {primaryAction.icon}
-            {primaryAction.label}
-          </button>
+        <svg className="hero-horizon" viewBox="0 0 640 240" preserveAspectRatio="none" fill="none" aria-hidden="true">
+          <circle cx="340" cy="58" r="29" fill="#FFE7A6" />
+          <path d="M0 188C90 152 119 180 192 158S299 179 382 157 531 150 640 108V240H0Z" fill="#BDDEF3" />
+          <path d="M0 222C129 176 195 222 310 202S504 179 640 198V240H0Z" fill="#95C8E8" />
+          <path d="M390 39l68-21-27 52-9-27-32-4Z" fill="white" stroke="#4286B0" strokeWidth="1.5" strokeLinejoin="round" />
+          <path d="m422 43 36-25" stroke="#4286B0" strokeWidth="1.5" />
+          <path d="M411 67c-33 9-29 37-62 41" stroke="#6FAACD" strokeWidth="1.5" strokeDasharray="5 6" />
+        </svg>
+        <div className="hero-document" aria-label="当前经历摘要">
+          <div className="hero-document__top"><FileText size={20} /><span>我的下一份简历</span></div>
+          <h3>{profile.name || "你的名字"}</h3><p>{profile.targetRole || "一个想尝试的方向"}</p>
+          <div className="hero-document__rule" />
+          <strong>我做过的项目</strong><p>{profile.projects.split("\n").find((line) => line.trim()) || "从你参与过的一件真实的事开始。"}</p>
+          <button type="button" onClick={() => onGo("builder")}>打开我的简历 <ArrowUpRight size={16} /></button>
         </div>
       </section>
 
+      <section className="template-invitation"><div><Shapes size={26} /><div><h2>表达也可以有自己的样子。</h2><p>选择简历版式，再用岗位提纲梳理想说的内容。</p></div></div><button className="secondary-button" type="button" onClick={() => onGo("templates")}>看看模板与提纲 <ArrowUpRight size={17} /></button></section>
+
       <section className="workflow-panel" aria-label="求职流程进度">
         <div className="workflow-heading">
-          <PanelTitle icon={<Library size={20} />} title="流程进度" />
-          <button className="secondary-button compact-button" type="button" onClick={onGenerate}>
-            <Sparkles size={17} />
-            从经历库生成
+          <PanelTitle icon={<Library size={20} />} title="一步一步，准备下一站" />
+          <button className="ghost-button compact-button" type="button" onClick={primaryAction.onClick}>
+            {primaryAction.label}<ArrowUpRight size={17} />
           </button>
         </div>
         <div className="workflow-steps">
@@ -430,7 +443,7 @@ export function BuilderView({
           <>
             <div className="edit-header">
               <div>
-                <p className="eyebrow">{selectedResume.source}</p>
+                <p className="resume-source-label">{selectedResume.source === "optimized" ? "岗位定制版本" : selectedResume.source === "uploaded" ? "从文本导入" : "从经历库创建"}</p>
                 <div className="title-editor">
                   <input value={renameDraft} onChange={(event) => setRenameDraft(event.target.value)} />
                   <button className="secondary-button icon-button" type="button" onClick={() => onRename(selectedResume.id)} title="保存名称">
@@ -1116,15 +1129,16 @@ function ReportView({
 function ResumePaper({ profile, resume }: { profile: CandidateProfile; resume: ResumeVersion }) {
   const identity = getResumeIdentity(profile, resume);
   const contact = [identity.phone, identity.email, identity.location].filter(Boolean).join(" · ");
+  const sections = getOrderedResumeSections(resume);
+  const sidebarIds = new Set(["skills", "education", "awards"]);
+  const renderSection = (section: (typeof sections)[number]) => <ResumeSection items={section.items} key={section.id} title={section.title} />;
   return (
-    <article className={`resume-paper resume-paper--${resume.template}`}>
+    <article className={`resume-paper resume-paper--${resume.template}`} style={{ "--resume-accent": getResumeTemplateDefinition(resume.template).accent } as CSSProperties}>
       <header>
         <h2>{identity.name || "未命名候选人"}</h2>
         {contact ? <p>{contact}</p> : null}
       </header>
-      {getOrderedResumeSections(resume).map((section) => (
-        <ResumeSection items={section.items} key={section.title} title={section.title} />
-      ))}
+      {resume.template === "sidebar" ? <><div className="resume-sidebar">{sections.filter((section) => sidebarIds.has(section.id)).map(renderSection)}</div><div className="resume-main">{sections.filter((section) => !sidebarIds.has(section.id)).map(renderSection)}</div></> : sections.map(renderSection)}
     </article>
   );
 }

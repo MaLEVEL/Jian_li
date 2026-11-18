@@ -1,8 +1,8 @@
-export type TabId = "workspace" | "agent" | "profile" | "builder" | "optimizer" | "applications";
+export type TabId = "workspace" | "agent" | "templates" | "profile" | "builder" | "optimizer" | "applications";
 
 export type ResumeSource = "generated" | "optimized" | "uploaded";
 
-export type ResumeTemplate = "graduate" | "internship" | "experienced";
+export type ResumeTemplate = "graduate" | "internship" | "experienced" | "technical" | "sidebar" | "editorial";
 
 export type ApplicationStatus =
   | "saved"
@@ -40,6 +40,52 @@ export interface ResumeSections {
   projects: string[];
   experience: string[];
   awards: string[];
+}
+
+export type ResumeSectionId = "intent" | "summary" | "skills" | "education" | "projects" | "experience" | "awards";
+
+export type ResumeTemplateLayout =
+  | "education-first"
+  | "skills-first"
+  | "experience-first"
+  | "single-column"
+  | "two-column-sidebar"
+  | "project-first";
+
+export interface ResumeTemplateSource {
+  kind: "original";
+  creator: string;
+  license: string;
+  note: string;
+}
+
+export interface ResumeTemplateDefinition {
+  id: ResumeTemplate;
+  name: string;
+  layout: ResumeTemplateLayout;
+  accent: string;
+  sectionOrder: ResumeSectionId[];
+  description: string;
+  version: string;
+  source: ResumeTemplateSource;
+}
+
+export type JobFrameworkId = "python-backend" | "agent-rag" | "fullstack" | "data-analysis";
+
+export interface JobFrameworkSection {
+  id: string;
+  title: string;
+  placeholders: string[];
+  evidenceChecks: string[];
+  preparationQuestions: string[];
+}
+
+export interface JobFrameworkDefinition {
+  id: JobFrameworkId;
+  name: string;
+  version: string;
+  description: string;
+  outline: JobFrameworkSection[];
 }
 
 export type QualityIssueLevel = "good" | "warn" | "bad";
