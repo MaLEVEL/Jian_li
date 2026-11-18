@@ -94,7 +94,7 @@ The JSON report includes schema version, generation time, dataset provenance, sc
 
 - All cases and labels are synthetic and deterministic; they do not estimate human agreement or hiring quality.
 - Scores measure weighted skill-string coverage and are not probability of hire.
-- The parser is lexical and does not understand negation; synthetic fixtures are written to avoid ambiguous negative claims.
+- The parser is lexical and has a limited negation filter; it does not provide general sentence-level semantic understanding. Synthetic evaluation fixtures avoid ambiguous negative claims, while focused parser tests cover selected negations.
 - Default evaluation is offline and reports no Token counts or costs.
 - Local mode does not run BGE and makes no BGE quality or latency claim.
 - A separate dense-vector baseline is not measured in local mode; sparse-vector comparison, when present, uses the local lexical sparse-vector helper actually exposed by the implementation.

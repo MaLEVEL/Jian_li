@@ -1,6 +1,8 @@
-# JobFit AI · JD–Resume Agent
+# JobFit · 求职作品室 / JD–Resume Agent
 
-面向 Python / Agent 求职的全栈作品：保留原有 React 简历编辑和投递管理，新增 FastAPI + LangGraph 分析服务、经历素材检索、批量排序与可复现评估。
+面向 Python / Agent 求职的全栈作品：React 天蓝色求职作品室 + FastAPI / LangGraph 分析服务，覆盖真实经历整理、简历制作、岗位拆解、面试准备和投递跟进。
+
+![JobFit 天蓝色求职作品室](docs/assets/sky-workspace.png)
 
 ## 功能
 
@@ -11,6 +13,9 @@
 - 素材 RAG：真实经历素材、BM25 + 向量双路召回 + RRF、建议引用；没有依据只给学习计划。
 - 最多 20 个 JD 批量排序，限制并发、单项失败隔离、CSV 导出。
 - SQLite 持久化素材和分析历史，报告展示模型模式、警告、耗时和 Token。
+- 运行时业务 Skills：JD 拆解与诊断、真实经历简历定制、面试速学与预测练习题，结果按分析报告保存，详见 [业务技能](docs/business-skills.md)。
+- 模板与提纲：六种固定简历版式，Python 后端、Agent/RAG、全栈、数据分析四种岗位框架，可选版式、展开检查项、复制 Markdown 提纲；模板不会为用户添加虚构经历。[产品参考与原创资产](docs/product-references.md)。
+- 全站采用天蓝色作品集风格；桌面侧导航、手机响应式编辑/预览切换，首页自托管衬线标题与原创地平线插画。
 - 保留经历库、简历编辑、版本管理、ATS 模板、DOCX / 浏览器 PDF 导出、投递跟进、JSON 备份。原有 JD 匹配是浏览器规则功能，真实后端分析位于 Agent 工作台。
 
 ## 架构
@@ -31,6 +36,8 @@ flowchart LR
 ```
 
 这是确定性的 LangGraph 多步骤工作流，工具由节点显式调用，当前未声称自主规划或模型驱动的 Function Calling。
+
+交付验证与已知限制见 [验证记录](docs/verification.md)，独立审查及修复证据见 [Superpowers 审计](docs/reviews/2026-11-18-superpowers-audit.md)。
 
 | 模块 | 选型 | 原因 |
 | --- | --- | --- |
@@ -119,6 +126,10 @@ docker compose down
 | DELETE | /api/materials/{id} | 删除素材 |
 | GET | /api/history | 最近 100 条报告 |
 | GET | /api/history/{id} | 报告详情 |
+| GET | /api/skills | 业务技能目录 |
+| POST | /api/skills/{skill_id}/run | 基于 analysis_id 执行业务技能 |
+| GET | /api/skill-runs | 指定分析的技能运行历史 |
+| GET | /api/skill-runs/{id} | 技能结果详情 |
 
 批量导出 API 和工作台的 CSV 导出都会重新执行分析，在线时可能再次消耗 Token。
 
