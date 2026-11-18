@@ -10,6 +10,8 @@ import {
   Upload,
   FileText,
   Shapes,
+  Menu,
+  X,
 } from "lucide-react";
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import { DEFAULT_PROFILE, EMPTY_JOB, SAMPLE_FRONTEND_JOB } from "./constants";
@@ -82,6 +84,7 @@ interface AppMessage {
 export default function App() {
   const storedState = useMemo(loadStoredState, []);
   const [activeTab, setActiveTab] = useState<TabId>("workspace");
+  const [navExpanded, setNavExpanded] = useState(false);
   const [profile, setProfile] = useState<CandidateProfile>(storedState.profile);
   const [resumes, setResumes] = useState<ResumeVersion[]>(storedState.resumes);
   const [applications, setApplications] = useState<ApplicationRecord[]>(storedState.applications);
@@ -170,7 +173,7 @@ export default function App() {
   function handleGenerateResume() {
     if (!profile.name.trim() || !profile.targetRole.trim()) {
       setMessage("请至少填写姓名和目标岗位，再生成简历。", "warning");
-      setActiveTab("profile");
+      navigateTo("profile");
       return;
     }
 
@@ -199,14 +202,14 @@ export default function App() {
 
     setResumes((current) => [resume, ...current]);
     setSelectedResumeId(resume.id);
-    setActiveTab("builder");
+    navigateTo("builder");
     setMessage("已根据经历库生成一份基础简历。下一步可以去 JD 匹配，或在简历版本里继续编辑。");
     return resume;
   }
 
   function loadSampleUser() {
     setProfile(DEFAULT_PROFILE);
-    setActiveTab("profile");
+    navigateTo("profile");
     setMessage("已载入示例用户经历库，可直接生成简历或继续修改字段。");
   }
 
@@ -287,7 +290,7 @@ export default function App() {
     setResumes((current) => [optimizedResume, baseResume, ...current]);
     setApplications((current) => [demoApplication, ...current]);
     setSelectedResumeId(optimizedResume.id);
-    setActiveTab("applications");
+    navigateTo("applications");
     setMessage("已载入完整演示流程：示例用户、基础简历、岗位定制版和一条投递记录。");
   }
 
@@ -362,7 +365,7 @@ export default function App() {
   function getMatchInput() {
     if (!selectedResume) {
       setMessage("请先生成或粘贴一份简历，再做 JD 匹配。", "warning");
-      setActiveTab("builder");
+      navigateTo("builder");
       return undefined;
     }
     const cleanedJob = cleanJobDraft(jobDraft);
@@ -556,7 +559,7 @@ export default function App() {
   function useSampleJob() {
     setJobDraft(SAMPLE_FRONTEND_JOB);
     setMatchPreview(undefined);
-    setActiveTab("optimizer");
+    navigateTo("optimizer");
     setMessage("已填入前端实习示例 JD，可直接生成匹配报告体验完整流程。");
   }
 
@@ -839,7 +842,7 @@ export default function App() {
       setResumes(restored.resumes);
       setApplications(restored.applications);
       setSelectedResumeId(restored.resumes[0]?.id ?? "");
-      setActiveTab("workspace");
+      navigateTo("workspace");
       setMessage("已导入数据备份，并完成结构校验。");
     } catch {
       setMessage("导入失败：请选择有效的 JobFit AI JSON 备份文件。", "error");
@@ -864,7 +867,7 @@ export default function App() {
     setJobDraft(EMPTY_JOB);
     setPasteTitle("我的已有简历");
     setPasteText("");
-    setActiveTab("workspace");
+    navigateTo("workspace");
     setMessage("已清空本地数据，并恢复示例经历库。");
   }
 
@@ -872,7 +875,7 @@ export default function App() {
     workspace: { title: "让好经历，有个好开场。", description: "这里是你的求职作品室。把经历、简历和每一次机会慢慢整理好。" },
     agent: { title: "把目标岗位，看得更清楚。", description: "从岗位要求到真实经历，找到值得表达的优势和下一步准备方向。" },
     profile: { title: "先把做过的事，写下来。", description: "课程项目、实习和个人作品，都是你自己的素材。" },
-    builder: { title: "一份简历，一个合适的版本。", description: "边写边看，把最能说明你的经历放在前面。" },
+    builder: { title: "一份简历，一个合适的版本。", description: "专心编辑，随时预览。把最能说明你的经历放在前面。" },
     optimizer: { title: "给这次投递，多一点针对性。", description: "用本地规则核对关键词，再用自己的事实判断取舍。" },
     applications: { title: "每一个机会，都有后续。", description: "记录投递、准备面试，也为下一次沟通留好线索。" },
     templates: { title: "选个版式，找到表达的起点。", description: "简历版式与岗位内容框架可以分别选择，真实经历始终由你填写。" },
@@ -886,14 +889,21 @@ export default function App() {
       if (!created) return;
       setResumes((current) => current.map((resume) => resume.id === created.id ? { ...resume, template } : resume));
     }
-    setActiveTab("builder");
+    navigateTo("builder");
     setMessage("已应用简历版式，经历内容保持原样。");
   }
 
+  function navigateTo(tab: TabId) {
+    setActiveTab(tab);
+    setNavExpanded(false);
+    document.getElementById("main-content")?.focus({ preventScroll: true });
+  }
+
   return (
-    <main className="app-shell">
+    <div className="app-shell">
       <a className="skip-link" href="#main-content">跳到主要内容</a>
-      <aside className="sidebar">
+      <header className="site-header">
+        <div className="site-header__identity">
         <div className="brand-lockup">
           <div className="brand-mark">JF</div>
           <div>
@@ -901,34 +911,37 @@ export default function App() {
             <span>求职作品室</span>
           </div>
         </div>
-        <nav className="nav-list" aria-label="主导航">
-          <NavButton active={activeTab === "workspace"} icon={<LayoutDashboard size={18} />} onClick={() => setActiveTab("workspace")}>
+        <div className="header-person"><span>{(profile.name || "我").slice(0, 1)}</span><div><strong>{profile.name || "我的作品室"}</strong><small>{profile.targetRole || "下一站，正在准备"}</small></div></div>
+        <button className="nav-toggle secondary-button" type="button" aria-label={navExpanded ? "收起导航" : "展开导航"} aria-expanded={navExpanded} aria-controls="primary-navigation" onClick={() => setNavExpanded((open) => !open)}>
+          {navExpanded ? <X size={20} /> : <Menu size={20} />}<span>导航</span>
+        </button>
+        </div>
+        <nav id="primary-navigation" className={`nav-list ${navExpanded ? "nav-list--expanded" : ""}`} aria-label="主导航" onKeyDown={(event) => { if (event.key === "Escape") { setNavExpanded(false); document.querySelector<HTMLButtonElement>(".nav-toggle")?.focus(); } }}>
+          <NavButton active={activeTab === "workspace"} icon={<LayoutDashboard size={18} />} onClick={() => navigateTo("workspace")}>
             工作台
           </NavButton>
-          <NavButton active={activeTab === "agent"} icon={<ScanSearch size={18} />} onClick={() => setActiveTab("agent")}>
+          <NavButton active={activeTab === "agent"} icon={<ScanSearch size={18} />} onClick={() => navigateTo("agent")}>
             岗位分析与准备
           </NavButton>
-          <NavButton active={activeTab === "profile"} icon={<Library size={18} />} onClick={() => setActiveTab("profile")}>
+          <NavButton active={activeTab === "profile"} icon={<Library size={18} />} onClick={() => navigateTo("profile")}>
             经历库
           </NavButton>
-          <NavButton active={activeTab === "builder"} icon={<FileText size={18} />} onClick={() => setActiveTab("builder")}>
+          <NavButton active={activeTab === "builder"} icon={<FileText size={18} />} onClick={() => navigateTo("builder")}>
             简历版本
           </NavButton>
-          <NavButton active={activeTab === "templates"} icon={<Shapes size={18} />} onClick={() => setActiveTab("templates")}>
+          <NavButton active={activeTab === "templates"} icon={<Shapes size={18} />} onClick={() => navigateTo("templates")}>
             模板与提纲
           </NavButton>
-          <NavButton active={activeTab === "optimizer"} icon={<Search size={18} />} onClick={() => setActiveTab("optimizer")}>
+          <NavButton active={activeTab === "optimizer"} icon={<Search size={18} />} onClick={() => navigateTo("optimizer")}>
             JD 匹配（本地规则）
           </NavButton>
-          <NavButton active={activeTab === "applications"} icon={<BriefcaseBusiness size={18} />} onClick={() => setActiveTab("applications")}>
+          <NavButton active={activeTab === "applications"} icon={<BriefcaseBusiness size={18} />} onClick={() => navigateTo("applications")}>
             投递管理
           </NavButton>
         </nav>
-        <div className="sidebar-person"><span>{(profile.name || "我").slice(0, 1)}</span><div><strong>{profile.name || "我的作品室"}</strong><small>{profile.targetRole || "下一站，正在准备"}</small></div></div>
-        <details className="sidebar-note"><summary>数据与运行方式</summary><p>简历与投递保存在本浏览器；岗位分析使用本地 Python 服务，页面会显示实际模型模式。</p></details>
-      </aside>
+      </header>
 
-      <section className="main-stage" id="main-content" tabIndex={-1}>
+      <main className="main-stage" id="main-content" tabIndex={-1}>
         <header className="topbar">
           <div>
             <h1>{pageCopy[activeTab].title}</h1>
@@ -936,11 +949,12 @@ export default function App() {
           </div>
           <div className="topbar-actions">
             <details className="data-settings">
-              <summary>
+              <summary aria-label="数据设置">
                 <Settings size={17} />
                 数据设置
               </summary>
               <div className="data-settings__menu">
+                <p className="data-settings__help">简历与投递保存在本浏览器；岗位分析由本地 Python 服务处理，页面会显示实际模型模式。</p>
                 <button className="ghost-button" type="button" onClick={exportDataBackup}>
                   <Download size={17} />
                   导出数据备份
@@ -973,7 +987,7 @@ export default function App() {
             profile={profile}
             resumes={resumes}
             onGenerate={handleGenerateResume}
-            onGo={setActiveTab}
+            onGo={navigateTo}
             onLoadSampleUser={loadSampleUser}
             onRunDemoFlow={runDemoFlow}
           />
@@ -1020,7 +1034,7 @@ export default function App() {
             onSelectResume={setSelectedResumeId}
             onTemplateChange={updateResumeTemplate}
             onUpdateResume={updateResumeContent}
-            onGo={setActiveTab}
+            onGo={navigateTo}
             setPasteText={updatePasteText}
             setPasteTitle={updatePasteTitle}
             setRenameDraft={setRenameDraft}
@@ -1055,7 +1069,7 @@ export default function App() {
             onStatusChange={updateApplicationStatus}
           />
         ) : null}
-      </section>
-    </main>
+      </main>
+    </div>
   );
 }

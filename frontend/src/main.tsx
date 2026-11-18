@@ -4,6 +4,7 @@ import App from "./App";
 import { ErrorBoundary } from "./ErrorBoundary";
 import "./styles.css";
 import "./portfolio.css";
+import "./workspace.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

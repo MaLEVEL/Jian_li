@@ -2,7 +2,7 @@
 
 面向 Python / Agent 求职的全栈作品：React 天蓝色求职作品室 + FastAPI / LangGraph 分析服务，覆盖真实经历整理、简历制作、岗位拆解、面试准备和投递跟进。
 
-![JobFit 天蓝色求职作品室](docs/assets/sky-workspace.png)
+![JobFit 天蓝色求职作品室与顶部导航](docs/assets/sky-workspace-1440.png)
 
 ## 功能
 

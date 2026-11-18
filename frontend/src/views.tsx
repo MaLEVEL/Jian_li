@@ -19,6 +19,10 @@ import {
   User,
   ArrowUpRight,
   Shapes,
+  ChevronDown,
+  PenLine,
+  Eye,
+  Plus,
 } from "lucide-react";
 import { ChangeEvent, CSSProperties, FormEvent, useMemo, useState } from "react";
 import { getResumeTemplateDefinition } from "./templateCatalog";
@@ -335,50 +339,60 @@ export function BuilderView({
   const selectedTemplateOption = selectedResume
     ? RESUME_TEMPLATE_OPTIONS.find((option) => option.value === selectedResume.template)
     : undefined;
-  const [mobileTab, setMobileTab] = useState<"versions" | "editor" | "preview">("versions");
-  const switchToEditor = () => setMobileTab("editor");
-  const switchToPreview = () => setMobileTab("preview");
+  const [activePane, setActivePane] = useState<"editor" | "preview">("editor");
+  const [managerOpen, setManagerOpen] = useState(!selectedResume);
+  const switchToEditor = () => { setActivePane("editor"); setManagerOpen(false); };
+  const switchToPreview = () => { setActivePane("preview"); setManagerOpen(false); };
 
   return (
     <div className="builder-layout">
-      <div className="builder-mobile-tabs" role="tablist" aria-label="简历版本页分区">
-        <button className={mobileTab === "versions" ? "builder-mobile-tab--active" : ""} type="button" onClick={() => setMobileTab("versions")}>
-          版本
-        </button>
-        <button className={mobileTab === "editor" ? "builder-mobile-tab--active" : ""} type="button" onClick={() => setMobileTab("editor")}>
-          编辑
-        </button>
-        <button className={mobileTab === "preview" ? "builder-mobile-tab--active" : ""} type="button" onClick={() => setMobileTab("preview")}>
-          预览
-        </button>
-      </div>
-
-      <section className={`builder-pane builder-pane--versions ${mobileTab === "versions" ? "builder-pane--active" : ""}`}>
-        <div className="builder-pane__heading">
-          <PanelTitle icon={<FileText size={20} />} title="版本管理" />
-        </div>
-        <div className="version-actions">
+      <div className="builder-controls" aria-label="简历工作区工具栏">
+        <label className="version-picker">
+          <span>当前版本</span>
+          <select value={selectedResume?.id ?? ""} onChange={(event) => onSelectResume(event.currentTarget.value)}>
+            {!resumes.length ? <option value="">先创建或导入一份简历</option> : resumes.map((resume) => <option key={resume.id} value={resume.id}>{resume.title}</option>)}
+          </select>
+          <small>{resumes.length ? `共 ${resumes.length} 个版本 · 内容保存在当前浏览器` : "从经历库创建，也可以导入已有文本"}</small>
+        </label>
+        <label className="template-picker">
+          <span>简历版式</span>
+          <select disabled={!selectedResume} value={selectedResume?.template ?? "graduate"} onChange={(event) => {
+            const nextTemplate = event.currentTarget.value;
+            if (selectedResume && isResumeTemplate(nextTemplate)) onTemplateChange(selectedResume.id, nextTemplate);
+          }}>
+            {RESUME_TEMPLATE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+          <small>{selectedTemplateOption?.description ?? "先选择版本，再挑选适合的版式"}</small>
+        </label>
+        <div className="builder-controls__actions">
           <button
-            className="primary-button"
+            className="secondary-button"
             type="button"
             onClick={() => {
               onGenerate();
               switchToEditor();
             }}
           >
-            <Sparkles size={18} />
-            新建
+            <Plus size={18} />
+            新建简历
           </button>
         </div>
+      </div>
+
+      <details className="version-manager" open={managerOpen} onToggle={(event) => setManagerOpen(event.currentTarget.open)}>
+        <summary><span><Library size={18} />版本与导入</span><span className="version-manager__summary">管理已有版本或粘贴简历<ChevronDown size={16} /></span></summary>
+        <div className="version-manager__body">
 
         <div className="import-panel">
           <strong>导入已有简历</strong>
-          <input value={pasteTitle} onChange={(event) => setPasteTitle(event.target.value)} placeholder="版本名称" />
+          <label><span>导入后的版本名称</span><input value={pasteTitle} onChange={(event) => setPasteTitle(event.target.value)} placeholder="例如：Python 后端基础版" /></label>
+          <label><span>已有简历文本</span>
           <textarea
             value={pasteText}
             onChange={(event) => setPasteText(event.target.value)}
             placeholder="粘贴简历文本"
           />
+          </label>
           <button
             className="secondary-button"
             type="button"
@@ -390,11 +404,12 @@ export function BuilderView({
             }}
           >
             <Upload size={17} />
-            识别
+            识别并核对内容
           </button>
         </div>
 
-        <div className="resume-list">
+        <div className="version-manager__list">
+        <div className="resume-list" aria-label="已有简历版本">
           {resumes.length ? (
             resumes.map((resume) => (
               <button
@@ -423,15 +438,34 @@ export function BuilderView({
             删除当前版本
           </button>
         ) : null}
-      </section>
+        </div>
+        </div>
+      </details>
 
-      <section className={`builder-pane builder-pane--editor ${mobileTab === "editor" ? "builder-pane--active" : ""}`}>
+      <div className="builder-viewbar">
+        <div className="builder-tabs" role="tablist" aria-label="简历工作区视图" onKeyDown={(event) => {
+          const panes = ["editor", "preview"] as const;
+          const index = panes.indexOf(activePane);
+          const next = event.key === "ArrowRight" ? (index + 1) % 2 : event.key === "ArrowLeft" ? (index + 1) % 2 : event.key === "Home" ? 0 : event.key === "End" ? 1 : -1;
+          if (next < 0) return;
+          event.preventDefault();
+          setActivePane(panes[next]);
+          event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus();
+        }}>
+          <button id="builder-tab-editor" role="tab" aria-selected={activePane === "editor"} aria-controls="builder-editor" tabIndex={activePane === "editor" ? 0 : -1} type="button" onClick={() => setActivePane("editor")}><PenLine size={18} />编辑</button>
+          <button id="builder-tab-preview" role="tab" aria-selected={activePane === "preview"} aria-controls="builder-preview" tabIndex={activePane === "preview" ? 0 : -1} type="button" onClick={() => setActivePane("preview")}><Eye size={18} />预览</button>
+        </div>
+        <p>先把内容写好，再看看它的样子。</p>
+      </div>
+
+      <section id="builder-editor" className="builder-pane builder-pane--editor" role="tabpanel" aria-labelledby="builder-tab-editor" hidden={activePane !== "editor"} tabIndex={0}>
         {importDraft ? (
           <ImportReviewPanel
             draft={importDraft}
             onCancel={() => {
               onCancelImport();
-              setMobileTab(selectedResume ? "editor" : "versions");
+              setActivePane("editor");
+              setManagerOpen(!selectedResume);
             }}
             onChange={onImportDraftChange}
             onConfirm={() => {
@@ -442,34 +476,16 @@ export function BuilderView({
         ) : selectedResume ? (
           <>
             <div className="edit-header">
-              <div>
+              <div className="resume-name-field">
                 <p className="resume-source-label">{selectedResume.source === "optimized" ? "岗位定制版本" : selectedResume.source === "uploaded" ? "从文本导入" : "从经历库创建"}</p>
+                <label htmlFor="resume-version-title">版本名称</label>
                 <div className="title-editor">
-                  <input value={renameDraft} onChange={(event) => setRenameDraft(event.target.value)} />
-                  <button className="secondary-button icon-button" type="button" onClick={() => onRename(selectedResume.id)} title="保存名称">
-                    <Save size={17} />
+                  <input id="resume-version-title" value={renameDraft} onChange={(event) => setRenameDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); onRename(selectedResume.id); } }} />
+                  <button className="secondary-button" type="button" onClick={() => onRename(selectedResume.id)}>
+                    <Save size={17} />保存名称
                   </button>
                 </div>
               </div>
-              <label className="template-picker">
-                <span>模板</span>
-                <select
-                  value={selectedResume.template}
-                  onChange={(event) => {
-                    const nextTemplate = event.currentTarget.value;
-                    if (isResumeTemplate(nextTemplate)) {
-                      onTemplateChange(selectedResume.id, nextTemplate);
-                    }
-                  }}
-                >
-                  {RESUME_TEMPLATE_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-                <small>{selectedTemplateOption?.description}</small>
-              </label>
             </div>
             <ResumeEditor profile={profile} resume={selectedResume} onUpdateResume={onUpdateResume} />
             {qualityReport ? (
@@ -478,13 +494,15 @@ export function BuilderView({
             <ReviewNotice resume={selectedResume} onMarkReviewed={onMarkReviewed} />
           </>
         ) : (
-          <EmptyState title="等待选择" text="先在左侧新建、导入或选择一个简历版本。" />
+          <EmptyState title="从一份简历开始" text="在上方新建简历，或展开“版本与导入”粘贴已有内容。" />
         )}
       </section>
 
-      <section className={`builder-pane builder-pane--preview ${mobileTab === "preview" ? "builder-pane--active" : ""}`}>
+      <section id="builder-preview" className="builder-pane builder-pane--preview" role="tabpanel" aria-labelledby="builder-tab-preview" hidden={activePane !== "preview"} tabIndex={0}>
         {selectedResume ? (
           <>
+            <div className="preview-toolbar">
+            <div><h2>简历预览</h2><p>{selectedTemplateOption?.label} · 导出前请核对内容</p></div>
             <div className="preview-actions">
               <button className="secondary-button" type="button" onClick={() => onCopy(selectedResume)}>
                 <Copy size={17} />
@@ -494,16 +512,18 @@ export function BuilderView({
                 <Download size={17} />
                 下载 .docx
               </button>
-              <button className="secondary-button" type="button" onClick={() => onExportPdf(selectedResume)}>
+              <button className="primary-button" type="button" onClick={() => onExportPdf(selectedResume)}>
                 <Download size={17} />
                 打印 PDF
               </button>
-              <button className="primary-button" type="button" onClick={() => onGo("optimizer")}>
+              <button className="ghost-button" type="button" onClick={() => onGo("optimizer")}>
                 <Target size={17} />
                 去 JD 匹配
               </button>
             </div>
-            <ResumePaper profile={profile} resume={selectedResume} />
+            </div>
+            <div className="preview-canvas"><ResumePaper profile={profile} resume={selectedResume} /></div>
+            <ReviewNotice resume={selectedResume} onMarkReviewed={onMarkReviewed} />
           </>
         ) : (
           <EmptyState title="暂无预览" text="选择或保存一个简历版本后，这里会显示 A4 预览。" />
