@@ -12,7 +12,9 @@ def experience_years(text: str) -> float | None:
 def local_job(text: str) -> dict:
     requirements = []
     for name in extract_skills(text):
-        clauses = [line for line in re.split(r'[\n。；;]', text) if skill_evidence(line, name)]
+        clauses = [line for line in re.split(r'[\n。；;，,]', text) if skill_evidence(line, name)]
+        if not clauses:
+            continue
         optional = all(re.search(r'加分|优先|可选|nice.to.have|preferred|bonus|optional', line, re.I) for line in clauses)
         requirements.append({'name': name, 'required': not optional, 'weight': 1.0 if optional else 3.0})
     return {'skills': requirements, 'experience_years': experience_years(text), 'domain': ''}
@@ -21,7 +23,8 @@ def local_job(text: str) -> dict:
 def local_resume(text: str) -> dict:
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     projects = [line[:500] for line in lines if re.search(r'项目|开发|实现|构建|project|built|develop', line, re.I)]
-    return {'skills': extract_skills(text), 'experience_years': experience_years(text), 'projects': projects[:30]}
+    return {'skills': [s for s in extract_skills(text) if skill_evidence(text, s)],
+            'experience_years': experience_years(text), 'projects': projects[:30]}
 
 
 def grounded_job(parsed: JobParsed, text: str) -> dict:

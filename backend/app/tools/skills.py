@@ -51,7 +51,8 @@ def extract_skills(text: str) -> list[str]:
 
 def skill_evidence(text: str, skill: str) -> str:
     aliases = ALIASES.get(canonical_skill(skill), [skill])
-    for line in re.split(r'[\n。；;]', text):
-        if any(contains(line, alias) for alias in aliases):
+    for line in re.split(r'[\n。；;，,]', text):
+        negated = re.search(r'未(?:曾|能|掌握|使用|接触|学习)|不(?:会|熟悉|掌握|具备|要求|需要)|无.{0,6}经验|尚未|not\s+(?:required|familiar|experienced)|no\s+experience|without', line, re.IGNORECASE)
+        if not negated and any(contains(line, alias) for alias in aliases):
             return line.strip()[:300]
     return ''
