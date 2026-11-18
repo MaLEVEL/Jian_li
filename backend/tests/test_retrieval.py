@@ -236,5 +236,3 @@ def test_bge_sync_and_query_are_serialized_between_concurrent_searches(monkeypat
     second.join(timeout=2)
     assert not first.is_alive() and not second.is_alive()
     assert actions == ["get", "query:start", "query:end", "get", "query:start", "query:end"]
-
-

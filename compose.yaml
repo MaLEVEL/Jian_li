@@ -1,0 +1,17 @@
+services:
+  jobfit:
+    build: .
+    ports:
+      - "127.0.0.1:${JOBFIT_PORT:-8000}:8000"
+    environment:
+      JOBFIT_API_KEY: ${JOBFIT_API_KEY:-}
+      JOBFIT_BASE_URL: ${JOBFIT_BASE_URL:-https://open.bigmodel.cn/api/paas/v4/}
+      JOBFIT_MODEL: ${JOBFIT_MODEL:-glm-4-flash}
+      JOBFIT_LLM_MODE: ${JOBFIT_LLM_MODE:-auto}
+      JOBFIT_RAG_MODE: local
+      JOBFIT_DATA_DIR: /app/data
+    volumes:
+      - jobfit-data:/app/data
+    restart: unless-stopped
+volumes:
+  jobfit-data:

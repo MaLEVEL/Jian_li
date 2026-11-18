@@ -103,6 +103,3 @@ async def test_upload_below_request_limit_reaches_resume_parser(tmp_path):
 
     assert response.status_code == 200
     assert response.json() == {"text": "简历 Python", "filename": "resume.txt"}
-
-
-

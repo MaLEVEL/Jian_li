@@ -99,4 +99,3 @@ describe("batch job import parser", () => {
     }))))).toThrow(AgentApiError);
   });
 });
-

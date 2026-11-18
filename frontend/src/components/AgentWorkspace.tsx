@@ -669,7 +669,3 @@ export function AgentWorkspace({
     </div>
   );
 }
-
-
-
-

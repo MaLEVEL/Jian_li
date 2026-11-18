@@ -99,5 +99,3 @@ The JSON report includes schema version, generation time, dataset provenance, sc
 - Local mode does not run BGE and makes no BGE quality or latency claim.
 - A separate dense-vector baseline is not measured in local mode; sparse-vector comparison, when present, uses the local lexical sparse-vector helper actually exposed by the implementation.
 - Timings are local wall-clock observations, not controlled benchmarks.
-
-
