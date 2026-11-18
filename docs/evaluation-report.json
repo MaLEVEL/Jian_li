@@ -1,0 +1,3284 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-11-18T02:22:07.134313+00:00",
+  "dataset_provenance": {
+    "score_cases": {
+      "count": 30,
+      "synthetic": true,
+      "human_annotation": false,
+      "authoring": "Hand-authored synthetic JD/resume pairs with expected weighted-score ranges for deterministic offline regression checks.",
+      "categories": {
+        "strong_coverage": 15,
+        "weak_or_nonmatching": 15
+      }
+    },
+    "retrieval_cases": {
+      "count": 8,
+      "synthetic": true,
+      "human_annotation": false,
+      "independent_relevance_labels": true,
+      "authoring": "Hand-authored synthetic material sets and relevant_ids, independent from the score-case resumes and JDs."
+    }
+  },
+  "count": 30,
+  "mode": "local-hybrid",
+  "retrieval_top_k": 3,
+  "metrics": {
+    "score": {
+      "count": 30,
+      "accuracy": 1.0,
+      "category_accuracy": {
+        "strong_coverage": 1.0,
+        "weak_or_nonmatching": 1.0
+      },
+      "cases": [
+        {
+          "id": "score-001",
+          "category": "strong_coverage",
+          "expected_min": 90.0,
+          "expected_max": 100.0,
+          "actual_score": 100.0,
+          "in_range": true,
+          "matched_skills": [
+            "Python",
+            "FastAPI",
+            "PostgreSQL",
+            "Docker"
+          ],
+          "missing_skills": [],
+          "breakdown": [
+            {
+              "skill": "Python",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "项目经历：使用 Python 和 FastAPI 开发账务 API"
+            },
+            {
+              "skill": "FastAPI",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "项目经历：使用 Python 和 FastAPI 开发账务 API"
+            },
+            {
+              "skill": "PostgreSQL",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "数据库为 PostgreSQL"
+            },
+            {
+              "skill": "Docker",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "服务用 Docker 部署"
+            }
+          ]
+        },
+        {
+          "id": "score-002",
+          "category": "strong_coverage",
+          "expected_min": 70.0,
+          "expected_max": 80.0,
+          "actual_score": 75.0,
+          "in_range": true,
+          "matched_skills": [
+            "Python",
+            "Django",
+            "React"
+          ],
+          "missing_skills": [
+            "TypeScript"
+          ],
+          "breakdown": [
+            {
+              "skill": "Python",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "经历：用 Python 与 Django 维护电商后台"
+            },
+            {
+              "skill": "Django",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "经历：用 Python 与 Django 维护电商后台"
+            },
+            {
+              "skill": "React",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "前端主要负责 React 组件"
+            },
+            {
+              "skill": "TypeScript",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            }
+          ]
+        },
+        {
+          "id": "score-003",
+          "category": "strong_coverage",
+          "expected_min": 90.0,
+          "expected_max": 100.0,
+          "actual_score": 100.0,
+          "in_range": true,
+          "matched_skills": [
+            "Python",
+            "LangGraph",
+            "RAG",
+            "ChromaDB"
+          ],
+          "missing_skills": [],
+          "breakdown": [
+            {
+              "skill": "Python",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "经历：用 Python 实现 RAG 检索链路"
+            },
+            {
+              "skill": "LangGraph",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "状态编排采用 LangGraph"
+            },
+            {
+              "skill": "RAG",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "经历：用 Python 实现 RAG 检索链路"
+            },
+            {
+              "skill": "ChromaDB",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "向量库使用 ChromaDB"
+            }
+          ]
+        },
+        {
+          "id": "score-004",
+          "category": "strong_coverage",
+          "expected_min": 90.0,
+          "expected_max": 100.0,
+          "actual_score": 100.0,
+          "in_range": true,
+          "matched_skills": [
+            "Python",
+            "LangGraph",
+            "Function Calling",
+            "Agent"
+          ],
+          "missing_skills": [],
+          "breakdown": [
+            {
+              "skill": "Python",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "经历：基于 Python 构建 Agent 工作流"
+            },
+            {
+              "skill": "LangGraph",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "流程由 LangGraph 驱动"
+            },
+            {
+              "skill": "Function Calling",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "实现 Function Calling 工具注册"
+            },
+            {
+              "skill": "Agent",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "经历：基于 Python 构建 Agent 工作流"
+            }
+          ]
+        },
+        {
+          "id": "score-005",
+          "category": "strong_coverage",
+          "expected_min": 90.0,
+          "expected_max": 100.0,
+          "actual_score": 100.0,
+          "in_range": true,
+          "matched_skills": [
+            "Python",
+            "SQL",
+            "Docker",
+            "Pandas"
+          ],
+          "missing_skills": [],
+          "breakdown": [
+            {
+              "skill": "Python",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "经历：使用 Python 与 Pandas 清洗订单数据"
+            },
+            {
+              "skill": "SQL",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "通过 SQL 校验指标"
+            },
+            {
+              "skill": "Docker",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "并用 Docker 打包任务镜像"
+            },
+            {
+              "skill": "Pandas",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "经历：使用 Python 与 Pandas 清洗订单数据"
+            }
+          ]
+        },
+        {
+          "id": "score-006",
+          "category": "strong_coverage",
+          "expected_min": 70.0,
+          "expected_max": 80.0,
+          "actual_score": 75.0,
+          "in_range": true,
+          "matched_skills": [
+            "Python",
+            "scikit-learn",
+            "PyTorch"
+          ],
+          "missing_skills": [
+            "Docker"
+          ],
+          "breakdown": [
+            {
+              "skill": "Python",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "经历：使用 Python、scikit-learn 与 PyTorch 完成排序模型实验"
+            },
+            {
+              "skill": "Docker",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "scikit-learn",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "经历：使用 Python、scikit-learn 与 PyTorch 完成排序模型实验"
+            },
+            {
+              "skill": "PyTorch",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "经历：使用 Python、scikit-learn 与 PyTorch 完成排序模型实验"
+            }
+          ]
+        },
+        {
+          "id": "score-007",
+          "category": "strong_coverage",
+          "expected_min": 90.0,
+          "expected_max": 100.0,
+          "actual_score": 100.0,
+          "in_range": true,
+          "matched_skills": [
+            "Python",
+            "Docker",
+            "Kafka",
+            "Elasticsearch"
+          ],
+          "missing_skills": [],
+          "breakdown": [
+            {
+              "skill": "Python",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "经历：用 Python 消费 Kafka 事件"
+            },
+            {
+              "skill": "Docker",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "并用 Docker 部署消费者"
+            },
+            {
+              "skill": "Kafka",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "经历：用 Python 消费 Kafka 事件"
+            },
+            {
+              "skill": "Elasticsearch",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "写入 Elasticsearch 检索服务"
+            }
+          ]
+        },
+        {
+          "id": "score-008",
+          "category": "strong_coverage",
+          "expected_min": 90.0,
+          "expected_max": 100.0,
+          "actual_score": 100.0,
+          "in_range": true,
+          "matched_skills": [
+            "Python",
+            "FastAPI",
+            "Redis",
+            "Celery"
+          ],
+          "missing_skills": [],
+          "breakdown": [
+            {
+              "skill": "Python",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "经历：使用 Python 与 FastAPI 提供接口"
+            },
+            {
+              "skill": "FastAPI",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "经历：使用 Python 与 FastAPI 提供接口"
+            },
+            {
+              "skill": "Redis",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "缓存使用 Redis"
+            },
+            {
+              "skill": "Celery",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "异步任务由 Celery 调度"
+            }
+          ]
+        },
+        {
+          "id": "score-009",
+          "category": "strong_coverage",
+          "expected_min": 70.0,
+          "expected_max": 85.0,
+          "actual_score": 80.0,
+          "in_range": true,
+          "matched_skills": [
+            "Python",
+            "Docker",
+            "React",
+            "GraphQL"
+          ],
+          "missing_skills": [
+            "TypeScript"
+          ],
+          "breakdown": [
+            {
+              "skill": "Python",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "经历：使用 Python 编写 GraphQL 服务"
+            },
+            {
+              "skill": "Docker",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "前端有 React 组件经验并用 Docker 发布服务"
+            },
+            {
+              "skill": "React",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "前端有 React 组件经验并用 Docker 发布服务"
+            },
+            {
+              "skill": "TypeScript",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "GraphQL",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "经历：使用 Python 编写 GraphQL 服务"
+            }
+          ]
+        },
+        {
+          "id": "score-010",
+          "category": "strong_coverage",
+          "expected_min": 90.0,
+          "expected_max": 100.0,
+          "actual_score": 100.0,
+          "in_range": true,
+          "matched_skills": [
+            "Python",
+            "Docker",
+            "Kubernetes",
+            "Git"
+          ],
+          "missing_skills": [],
+          "breakdown": [
+            {
+              "skill": "Python",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "经历：编写 Python 运维脚本"
+            },
+            {
+              "skill": "Docker",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "应用使用 Docker 镜像并由 Kubernetes 部署"
+            },
+            {
+              "skill": "Kubernetes",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "应用使用 Docker 镜像并由 Kubernetes 部署"
+            },
+            {
+              "skill": "Git",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "使用 Git 管理"
+            }
+          ]
+        },
+        {
+          "id": "score-011",
+          "category": "strong_coverage",
+          "expected_min": 90.0,
+          "expected_max": 100.0,
+          "actual_score": 100.0,
+          "in_range": true,
+          "matched_skills": [
+            "Python",
+            "MySQL",
+            "Docker",
+            "REST API"
+          ],
+          "missing_skills": [],
+          "breakdown": [
+            {
+              "skill": "Python",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "经历：使用 Python 开发 REST API"
+            },
+            {
+              "skill": "MySQL",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "主要数据库为 MySQL"
+            },
+            {
+              "skill": "Docker",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "并通过 Docker Compose 本地运行"
+            },
+            {
+              "skill": "REST API",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "经历：使用 Python 开发 REST API"
+            }
+          ]
+        },
+        {
+          "id": "score-012",
+          "category": "strong_coverage",
+          "expected_min": 90.0,
+          "expected_max": 100.0,
+          "actual_score": 100.0,
+          "in_range": true,
+          "matched_skills": [
+            "Python",
+            "RAG",
+            "LLM",
+            "Embedding"
+          ],
+          "missing_skills": [],
+          "breakdown": [
+            {
+              "skill": "Python",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "经历：使用 Python 构建 RAG 问答系统"
+            },
+            {
+              "skill": "RAG",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "经历：使用 Python 构建 RAG 问答系统"
+            },
+            {
+              "skill": "LLM",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "负责 Embedding 生成与 LLM 响应组装"
+            },
+            {
+              "skill": "Embedding",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "负责 Embedding 生成与 LLM 响应组装"
+            }
+          ]
+        },
+        {
+          "id": "score-013",
+          "category": "strong_coverage",
+          "expected_min": 90.0,
+          "expected_max": 100.0,
+          "actual_score": 100.0,
+          "in_range": true,
+          "matched_skills": [
+            "Python",
+            "SQL",
+            "Pandas",
+            "NumPy"
+          ],
+          "missing_skills": [],
+          "breakdown": [
+            {
+              "skill": "Python",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "经历：日常使用 SQL 与 Python"
+            },
+            {
+              "skill": "SQL",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "经历：日常使用 SQL 与 Python"
+            },
+            {
+              "skill": "Pandas",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "使用 Pandas 与 NumPy 处理销售分析数据"
+            },
+            {
+              "skill": "NumPy",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "使用 Pandas 与 NumPy 处理销售分析数据"
+            }
+          ]
+        },
+        {
+          "id": "score-014",
+          "category": "strong_coverage",
+          "expected_min": 90.0,
+          "expected_max": 100.0,
+          "actual_score": 100.0,
+          "in_range": true,
+          "matched_skills": [
+            "Python",
+            "Docker",
+            "Git",
+            "pytest"
+          ],
+          "missing_skills": [],
+          "breakdown": [
+            {
+              "skill": "Python",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "经历：使用 Python 与 pytest 编写自动化测试"
+            },
+            {
+              "skill": "Docker",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "测试环境由 Docker 提供"
+            },
+            {
+              "skill": "Git",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "代码通过 Git 管理"
+            },
+            {
+              "skill": "pytest",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "经历：使用 Python 与 pytest 编写自动化测试"
+            }
+          ]
+        },
+        {
+          "id": "score-015",
+          "category": "strong_coverage",
+          "expected_min": 70.0,
+          "expected_max": 80.0,
+          "actual_score": 75.0,
+          "in_range": true,
+          "matched_skills": [
+            "Python",
+            "RAG",
+            "FAISS"
+          ],
+          "missing_skills": [
+            "LangChain"
+          ],
+          "breakdown": [
+            {
+              "skill": "Python",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "经历：使用 Python 与 FAISS 建立向量索引"
+            },
+            {
+              "skill": "LangChain",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "RAG",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "并接入 RAG 查询链路"
+            },
+            {
+              "skill": "FAISS",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "经历：使用 Python 与 FAISS 建立向量索引"
+            }
+          ]
+        },
+        {
+          "id": "score-016",
+          "category": "weak_or_nonmatching",
+          "expected_min": 0.0,
+          "expected_max": 15.0,
+          "actual_score": 0.0,
+          "in_range": true,
+          "matched_skills": [],
+          "missing_skills": [
+            "Python",
+            "FastAPI",
+            "PostgreSQL",
+            "Docker"
+          ],
+          "breakdown": [
+            {
+              "skill": "Python",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "FastAPI",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "PostgreSQL",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "Docker",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            }
+          ]
+        },
+        {
+          "id": "score-017",
+          "category": "weak_or_nonmatching",
+          "expected_min": 0.0,
+          "expected_max": 15.0,
+          "actual_score": 0.0,
+          "in_range": true,
+          "matched_skills": [],
+          "missing_skills": [
+            "Python",
+            "FastAPI",
+            "SQL",
+            "Docker"
+          ],
+          "breakdown": [
+            {
+              "skill": "Python",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "FastAPI",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "SQL",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "Docker",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            }
+          ]
+        },
+        {
+          "id": "score-018",
+          "category": "weak_or_nonmatching",
+          "expected_min": 20.0,
+          "expected_max": 40.0,
+          "actual_score": 25.0,
+          "in_range": true,
+          "matched_skills": [
+            "Python"
+          ],
+          "missing_skills": [
+            "FastAPI",
+            "PostgreSQL",
+            "Redis"
+          ],
+          "breakdown": [
+            {
+              "skill": "Python",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "学习项目：完成 Python 命令行工具"
+            },
+            {
+              "skill": "FastAPI",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "PostgreSQL",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "Redis",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            }
+          ]
+        },
+        {
+          "id": "score-019",
+          "category": "weak_or_nonmatching",
+          "expected_min": 0.0,
+          "expected_max": 10.0,
+          "actual_score": 0.0,
+          "in_range": true,
+          "matched_skills": [],
+          "missing_skills": [
+            "Python",
+            "SQL",
+            "Docker",
+            "Pandas"
+          ],
+          "breakdown": [
+            {
+              "skill": "Python",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "SQL",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "Docker",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "Pandas",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            }
+          ]
+        },
+        {
+          "id": "score-020",
+          "category": "weak_or_nonmatching",
+          "expected_min": 0.0,
+          "expected_max": 15.0,
+          "actual_score": 0.0,
+          "in_range": true,
+          "matched_skills": [],
+          "missing_skills": [
+            "Python",
+            "Docker",
+            "scikit-learn",
+            "PyTorch"
+          ],
+          "breakdown": [
+            {
+              "skill": "Python",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "Docker",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "scikit-learn",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "PyTorch",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            }
+          ]
+        },
+        {
+          "id": "score-021",
+          "category": "weak_or_nonmatching",
+          "expected_min": 0.0,
+          "expected_max": 10.0,
+          "actual_score": 0.0,
+          "in_range": true,
+          "matched_skills": [],
+          "missing_skills": [
+            "Python",
+            "LangGraph",
+            "RAG",
+            "LLM"
+          ],
+          "breakdown": [
+            {
+              "skill": "Python",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "LangGraph",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "RAG",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "LLM",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            }
+          ]
+        },
+        {
+          "id": "score-022",
+          "category": "weak_or_nonmatching",
+          "expected_min": 0.0,
+          "expected_max": 10.0,
+          "actual_score": 0.0,
+          "in_range": true,
+          "matched_skills": [],
+          "missing_skills": [
+            "Python",
+            "SQL",
+            "Docker",
+            "Pandas"
+          ],
+          "breakdown": [
+            {
+              "skill": "Python",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "SQL",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "Docker",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "Pandas",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            }
+          ]
+        },
+        {
+          "id": "score-023",
+          "category": "weak_or_nonmatching",
+          "expected_min": 20.0,
+          "expected_max": 40.0,
+          "actual_score": 25.0,
+          "in_range": true,
+          "matched_skills": [
+            "Python"
+          ],
+          "missing_skills": [
+            "FastAPI",
+            "Redis",
+            "Celery"
+          ],
+          "breakdown": [
+            {
+              "skill": "Python",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "经历：大学课程使用 Python 完成脚本作业"
+            },
+            {
+              "skill": "FastAPI",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "Redis",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "Celery",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            }
+          ]
+        },
+        {
+          "id": "score-024",
+          "category": "weak_or_nonmatching",
+          "expected_min": 0.0,
+          "expected_max": 15.0,
+          "actual_score": 0.0,
+          "in_range": true,
+          "matched_skills": [],
+          "missing_skills": [
+            "Python",
+            "Django",
+            "MySQL",
+            "Docker"
+          ],
+          "breakdown": [
+            {
+              "skill": "Python",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "Django",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "MySQL",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "Docker",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            }
+          ]
+        },
+        {
+          "id": "score-025",
+          "category": "weak_or_nonmatching",
+          "expected_min": 0.0,
+          "expected_max": 10.0,
+          "actual_score": 0.0,
+          "in_range": true,
+          "matched_skills": [],
+          "missing_skills": [
+            "Python",
+            "Docker",
+            "Kubernetes",
+            "Git"
+          ],
+          "breakdown": [
+            {
+              "skill": "Python",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "Docker",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "Kubernetes",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "Git",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            }
+          ]
+        },
+        {
+          "id": "score-026",
+          "category": "weak_or_nonmatching",
+          "expected_min": 0.0,
+          "expected_max": 15.0,
+          "actual_score": 0.0,
+          "in_range": true,
+          "matched_skills": [],
+          "missing_skills": [
+            "Python",
+            "MongoDB",
+            "Docker",
+            "REST API"
+          ],
+          "breakdown": [
+            {
+              "skill": "Python",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "MongoDB",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "Docker",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "REST API",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            }
+          ]
+        },
+        {
+          "id": "score-027",
+          "category": "weak_or_nonmatching",
+          "expected_min": 20.0,
+          "expected_max": 40.0,
+          "actual_score": 25.0,
+          "in_range": true,
+          "matched_skills": [
+            "Python"
+          ],
+          "missing_skills": [
+            "scikit-learn",
+            "PyTorch",
+            "Pandas"
+          ],
+          "breakdown": [
+            {
+              "skill": "Python",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "经历：正在学习 Python 基础语法"
+            },
+            {
+              "skill": "scikit-learn",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "PyTorch",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "Pandas",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            }
+          ]
+        },
+        {
+          "id": "score-028",
+          "category": "weak_or_nonmatching",
+          "expected_min": 20.0,
+          "expected_max": 40.0,
+          "actual_score": 25.0,
+          "in_range": true,
+          "matched_skills": [
+            "Python"
+          ],
+          "missing_skills": [
+            "LangGraph",
+            "Function Calling",
+            "Agent"
+          ],
+          "breakdown": [
+            {
+              "skill": "Python",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "经历：使用 Python 编写过文件整理脚本"
+            },
+            {
+              "skill": "LangGraph",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "Function Calling",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "Agent",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            }
+          ]
+        },
+        {
+          "id": "score-029",
+          "category": "weak_or_nonmatching",
+          "expected_min": 25.0,
+          "expected_max": 40.0,
+          "actual_score": 25.0,
+          "in_range": true,
+          "matched_skills": [
+            "Docker"
+          ],
+          "missing_skills": [
+            "Python",
+            "Kubernetes",
+            "GitHub Actions"
+          ],
+          "breakdown": [
+            {
+              "skill": "Python",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "Docker",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "经历：能阅读并运行 Docker 命令"
+            },
+            {
+              "skill": "Kubernetes",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "GitHub Actions",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            }
+          ]
+        },
+        {
+          "id": "score-030",
+          "category": "weak_or_nonmatching",
+          "expected_min": 20.0,
+          "expected_max": 40.0,
+          "actual_score": 25.0,
+          "in_range": true,
+          "matched_skills": [
+            "Python"
+          ],
+          "missing_skills": [
+            "PostgreSQL",
+            "Redis",
+            "MongoDB"
+          ],
+          "breakdown": [
+            {
+              "skill": "Python",
+              "weight": 3.0,
+              "matched": true,
+              "evidence": "学习过 Python 入门课程"
+            },
+            {
+              "skill": "PostgreSQL",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "Redis",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            },
+            {
+              "skill": "MongoDB",
+              "weight": 3.0,
+              "matched": false,
+              "evidence": ""
+            }
+          ]
+        }
+      ],
+      "duration_seconds": 0.252569800009951
+    },
+    "alias": {
+      "true_alias_count": 5,
+      "distinct_framework_count": 4,
+      "production_alias_accuracy": 1.0,
+      "exact_baseline_accuracy": 0.0,
+      "alias_gain_over_exact": 1.0,
+      "distinct_framework_non_equivalence": 1.0,
+      "cases": [
+        {
+          "pair_id": "sklearn_vs_scikit_learn",
+          "requirement": "scikit-learn",
+          "resume_skill": "sklearn",
+          "should_match": true,
+          "production_matched": true,
+          "exact_baseline_matched": false,
+          "correct": true
+        },
+        {
+          "pair_id": "postgres_vs_postgresql",
+          "requirement": "PostgreSQL",
+          "resume_skill": "postgres",
+          "should_match": true,
+          "production_matched": true,
+          "exact_baseline_matched": false,
+          "correct": true
+        },
+        {
+          "pair_id": "k8s_vs_kubernetes",
+          "requirement": "Kubernetes",
+          "resume_skill": "k8s",
+          "should_match": true,
+          "production_matched": true,
+          "exact_baseline_matched": false,
+          "correct": true
+        },
+        {
+          "pair_id": "torch_vs_pytorch",
+          "requirement": "PyTorch",
+          "resume_skill": "torch",
+          "should_match": true,
+          "production_matched": true,
+          "exact_baseline_matched": false,
+          "correct": true
+        },
+        {
+          "pair_id": "reactjs_vs_react",
+          "requirement": "React",
+          "resume_skill": "reactjs",
+          "should_match": true,
+          "production_matched": true,
+          "exact_baseline_matched": false,
+          "correct": true
+        },
+        {
+          "pair_id": "langchain_vs_langgraph",
+          "requirement": "LangGraph",
+          "resume_skill": "LangChain",
+          "should_match": false,
+          "production_matched": false,
+          "exact_baseline_matched": false,
+          "correct": true
+        },
+        {
+          "pair_id": "java_vs_javascript",
+          "requirement": "Java",
+          "resume_skill": "JavaScript",
+          "should_match": false,
+          "production_matched": false,
+          "exact_baseline_matched": false,
+          "correct": true
+        },
+        {
+          "pair_id": "pytorch_vs_tensorflow",
+          "requirement": "PyTorch",
+          "resume_skill": "TensorFlow",
+          "should_match": false,
+          "production_matched": false,
+          "exact_baseline_matched": false,
+          "correct": true
+        },
+        {
+          "pair_id": "fastapi_vs_django",
+          "requirement": "FastAPI",
+          "resume_skill": "Django",
+          "should_match": false,
+          "production_matched": false,
+          "exact_baseline_matched": false,
+          "correct": true
+        }
+      ],
+      "duration_seconds": 0.001070900005288422
+    },
+    "retrieval": {
+      "mode": "local-hybrid",
+      "count": 8,
+      "top_k": 3,
+      "mean_recall_at_k": 1.0,
+      "component_comparison_available": true,
+      "metrics": {
+        "hybrid": {
+          "count": 8,
+          "mean_recall_at_k": 1.0
+        },
+        "bm25": {
+          "count": 8,
+          "mean_recall_at_k": 1.0
+        },
+        "sparse_vector": {
+          "count": 8,
+          "mean_recall_at_k": 1.0
+        }
+      },
+      "cases": [
+        {
+          "id": "retrieval-001",
+          "query": "Python FastAPI 服务开发",
+          "relevant_ids": [
+            "api"
+          ],
+          "top_k": 3,
+          "hit_ids": [
+            "api",
+            "ops",
+            "invoice"
+          ],
+          "recall_at_k": 1.0,
+          "hits": [
+            {
+              "id": "api",
+              "title": "FastAPI 服务",
+              "content": "使用 Python 和 FastAPI 实现订单 API",
+              "score": 0.03278688524590164,
+              "source": "local-hybrid"
+            },
+            {
+              "id": "ops",
+              "title": "服务器巡检",
+              "content": "维护 Linux 服务器与巡检报告",
+              "score": 0.016129032258064516,
+              "source": "local-hybrid"
+            },
+            {
+              "id": "invoice",
+              "title": "发票整理",
+              "content": "整理电子发票并导出 Excel",
+              "score": 0.015873015873015872,
+              "source": "local-hybrid"
+            }
+          ],
+          "component_recall_at_k": {
+            "bm25": 1.0,
+            "sparse_vector": 1.0
+          }
+        },
+        {
+          "id": "retrieval-002",
+          "query": "LangGraph Agent 状态编排",
+          "relevant_ids": [
+            "langgraph"
+          ],
+          "top_k": 3,
+          "hit_ids": [
+            "langgraph",
+            "langchain"
+          ],
+          "recall_at_k": 1.0,
+          "hits": [
+            {
+              "id": "langgraph",
+              "title": "智能体状态图",
+              "content": "使用 LangGraph 实现 Agent 状态编排和循环控制",
+              "score": 0.03278688524590164,
+              "source": "local-hybrid"
+            },
+            {
+              "id": "langchain",
+              "title": "链式调用",
+              "content": "使用 LangChain 串联提示词和模型调用",
+              "score": 0.016129032258064516,
+              "source": "local-hybrid"
+            }
+          ],
+          "component_recall_at_k": {
+            "bm25": 1.0,
+            "sparse_vector": 1.0
+          }
+        },
+        {
+          "id": "retrieval-003",
+          "query": "scikit-learn 分类模型",
+          "relevant_ids": [
+            "sklearn"
+          ],
+          "top_k": 3,
+          "hit_ids": [
+            "sklearn",
+            "torch"
+          ],
+          "recall_at_k": 1.0,
+          "hits": [
+            {
+              "id": "sklearn",
+              "title": "分类模型",
+              "content": "使用 Python 与 scikit-learn 训练客户流失分类模型",
+              "score": 0.03278688524590164,
+              "source": "local-hybrid"
+            },
+            {
+              "id": "torch",
+              "title": "深度学习",
+              "content": "使用 PyTorch 训练图像分类网络",
+              "score": 0.016129032258064516,
+              "source": "local-hybrid"
+            }
+          ],
+          "component_recall_at_k": {
+            "bm25": 1.0,
+            "sparse_vector": 1.0
+          }
+        },
+        {
+          "id": "retrieval-004",
+          "query": "PostgreSQL 查询优化",
+          "relevant_ids": [
+            "postgres"
+          ],
+          "top_k": 3,
+          "hit_ids": [
+            "postgres"
+          ],
+          "recall_at_k": 1.0,
+          "hits": [
+            {
+              "id": "postgres",
+              "title": "数据库优化",
+              "content": "优化 PostgreSQL 慢查询并调整索引",
+              "score": 0.03278688524590164,
+              "source": "local-hybrid"
+            }
+          ],
+          "component_recall_at_k": {
+            "bm25": 1.0,
+            "sparse_vector": 1.0
+          }
+        },
+        {
+          "id": "retrieval-005",
+          "query": "RAG ChromaDB 证据检索",
+          "relevant_ids": [
+            "rag"
+          ],
+          "top_k": 3,
+          "hit_ids": [
+            "rag",
+            "bm25",
+            "etl"
+          ],
+          "recall_at_k": 1.0,
+          "hits": [
+            {
+              "id": "rag",
+              "title": "RAG 问答",
+              "content": "使用 ChromaDB 存储文档向量并支撑 RAG 问答",
+              "score": 0.03252247488101534,
+              "source": "local-hybrid"
+            },
+            {
+              "id": "bm25",
+              "title": "搜索排序",
+              "content": "使用 BM25 完成关键词检索",
+              "score": 0.01639344262295082,
+              "source": "local-hybrid"
+            },
+            {
+              "id": "etl",
+              "title": "数据管道",
+              "content": "使用 Python 定时同步业务数据",
+              "score": 0.015873015873015872,
+              "source": "local-hybrid"
+            }
+          ],
+          "component_recall_at_k": {
+            "bm25": 1.0,
+            "sparse_vector": 1.0
+          }
+        },
+        {
+          "id": "retrieval-006",
+          "query": "Kafka 实时数据管道",
+          "relevant_ids": [
+            "kafka"
+          ],
+          "top_k": 3,
+          "hit_ids": [
+            "kafka",
+            "batch"
+          ],
+          "recall_at_k": 1.0,
+          "hits": [
+            {
+              "id": "kafka",
+              "title": "实时管道",
+              "content": "使用 Python 消费 Kafka 事件并写入数据仓库",
+              "score": 0.03278688524590164,
+              "source": "local-hybrid"
+            },
+            {
+              "id": "batch",
+              "title": "离线任务",
+              "content": "每日批量导出 CSV 文件",
+              "score": 0.016129032258064516,
+              "source": "local-hybrid"
+            }
+          ],
+          "component_recall_at_k": {
+            "bm25": 1.0,
+            "sparse_vector": 1.0
+          }
+        },
+        {
+          "id": "retrieval-007",
+          "query": "Redis 缓存加速",
+          "relevant_ids": [
+            "redis"
+          ],
+          "top_k": 3,
+          "hit_ids": [
+            "redis",
+            "mongo"
+          ],
+          "recall_at_k": 1.0,
+          "hits": [
+            {
+              "id": "redis",
+              "title": "缓存实践",
+              "content": "使用 Redis 缓存热点数据并降低数据库压力",
+              "score": 0.03278688524590164,
+              "source": "local-hybrid"
+            },
+            {
+              "id": "mongo",
+              "title": "文档库",
+              "content": "使用 MongoDB 存储用户行为事件",
+              "score": 0.016129032258064516,
+              "source": "local-hybrid"
+            }
+          ],
+          "component_recall_at_k": {
+            "bm25": 1.0,
+            "sparse_vector": 1.0
+          }
+        },
+        {
+          "id": "retrieval-008",
+          "query": "Docker Kubernetes 部署",
+          "relevant_ids": [
+            "deploy"
+          ],
+          "top_k": 3,
+          "hit_ids": [
+            "deploy"
+          ],
+          "recall_at_k": 1.0,
+          "hits": [
+            {
+              "id": "deploy",
+              "title": "容器部署",
+              "content": "使用 Docker 打包服务并部署到 Kubernetes",
+              "score": 0.03278688524590164,
+              "source": "local-hybrid"
+            }
+          ],
+          "component_recall_at_k": {
+            "bm25": 1.0,
+            "sparse_vector": 1.0
+          }
+        }
+      ],
+      "duration_seconds": 3.461442599975271
+    }
+  },
+  "results": {
+    "score_cases": [
+      {
+        "id": "score-001",
+        "category": "strong_coverage",
+        "expected_min": 90.0,
+        "expected_max": 100.0,
+        "actual_score": 100.0,
+        "in_range": true,
+        "matched_skills": [
+          "Python",
+          "FastAPI",
+          "PostgreSQL",
+          "Docker"
+        ],
+        "missing_skills": [],
+        "breakdown": [
+          {
+            "skill": "Python",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "项目经历：使用 Python 和 FastAPI 开发账务 API"
+          },
+          {
+            "skill": "FastAPI",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "项目经历：使用 Python 和 FastAPI 开发账务 API"
+          },
+          {
+            "skill": "PostgreSQL",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "数据库为 PostgreSQL"
+          },
+          {
+            "skill": "Docker",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "服务用 Docker 部署"
+          }
+        ]
+      },
+      {
+        "id": "score-002",
+        "category": "strong_coverage",
+        "expected_min": 70.0,
+        "expected_max": 80.0,
+        "actual_score": 75.0,
+        "in_range": true,
+        "matched_skills": [
+          "Python",
+          "Django",
+          "React"
+        ],
+        "missing_skills": [
+          "TypeScript"
+        ],
+        "breakdown": [
+          {
+            "skill": "Python",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "经历：用 Python 与 Django 维护电商后台"
+          },
+          {
+            "skill": "Django",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "经历：用 Python 与 Django 维护电商后台"
+          },
+          {
+            "skill": "React",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "前端主要负责 React 组件"
+          },
+          {
+            "skill": "TypeScript",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          }
+        ]
+      },
+      {
+        "id": "score-003",
+        "category": "strong_coverage",
+        "expected_min": 90.0,
+        "expected_max": 100.0,
+        "actual_score": 100.0,
+        "in_range": true,
+        "matched_skills": [
+          "Python",
+          "LangGraph",
+          "RAG",
+          "ChromaDB"
+        ],
+        "missing_skills": [],
+        "breakdown": [
+          {
+            "skill": "Python",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "经历：用 Python 实现 RAG 检索链路"
+          },
+          {
+            "skill": "LangGraph",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "状态编排采用 LangGraph"
+          },
+          {
+            "skill": "RAG",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "经历：用 Python 实现 RAG 检索链路"
+          },
+          {
+            "skill": "ChromaDB",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "向量库使用 ChromaDB"
+          }
+        ]
+      },
+      {
+        "id": "score-004",
+        "category": "strong_coverage",
+        "expected_min": 90.0,
+        "expected_max": 100.0,
+        "actual_score": 100.0,
+        "in_range": true,
+        "matched_skills": [
+          "Python",
+          "LangGraph",
+          "Function Calling",
+          "Agent"
+        ],
+        "missing_skills": [],
+        "breakdown": [
+          {
+            "skill": "Python",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "经历：基于 Python 构建 Agent 工作流"
+          },
+          {
+            "skill": "LangGraph",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "流程由 LangGraph 驱动"
+          },
+          {
+            "skill": "Function Calling",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "实现 Function Calling 工具注册"
+          },
+          {
+            "skill": "Agent",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "经历：基于 Python 构建 Agent 工作流"
+          }
+        ]
+      },
+      {
+        "id": "score-005",
+        "category": "strong_coverage",
+        "expected_min": 90.0,
+        "expected_max": 100.0,
+        "actual_score": 100.0,
+        "in_range": true,
+        "matched_skills": [
+          "Python",
+          "SQL",
+          "Docker",
+          "Pandas"
+        ],
+        "missing_skills": [],
+        "breakdown": [
+          {
+            "skill": "Python",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "经历：使用 Python 与 Pandas 清洗订单数据"
+          },
+          {
+            "skill": "SQL",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "通过 SQL 校验指标"
+          },
+          {
+            "skill": "Docker",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "并用 Docker 打包任务镜像"
+          },
+          {
+            "skill": "Pandas",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "经历：使用 Python 与 Pandas 清洗订单数据"
+          }
+        ]
+      },
+      {
+        "id": "score-006",
+        "category": "strong_coverage",
+        "expected_min": 70.0,
+        "expected_max": 80.0,
+        "actual_score": 75.0,
+        "in_range": true,
+        "matched_skills": [
+          "Python",
+          "scikit-learn",
+          "PyTorch"
+        ],
+        "missing_skills": [
+          "Docker"
+        ],
+        "breakdown": [
+          {
+            "skill": "Python",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "经历：使用 Python、scikit-learn 与 PyTorch 完成排序模型实验"
+          },
+          {
+            "skill": "Docker",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "scikit-learn",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "经历：使用 Python、scikit-learn 与 PyTorch 完成排序模型实验"
+          },
+          {
+            "skill": "PyTorch",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "经历：使用 Python、scikit-learn 与 PyTorch 完成排序模型实验"
+          }
+        ]
+      },
+      {
+        "id": "score-007",
+        "category": "strong_coverage",
+        "expected_min": 90.0,
+        "expected_max": 100.0,
+        "actual_score": 100.0,
+        "in_range": true,
+        "matched_skills": [
+          "Python",
+          "Docker",
+          "Kafka",
+          "Elasticsearch"
+        ],
+        "missing_skills": [],
+        "breakdown": [
+          {
+            "skill": "Python",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "经历：用 Python 消费 Kafka 事件"
+          },
+          {
+            "skill": "Docker",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "并用 Docker 部署消费者"
+          },
+          {
+            "skill": "Kafka",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "经历：用 Python 消费 Kafka 事件"
+          },
+          {
+            "skill": "Elasticsearch",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "写入 Elasticsearch 检索服务"
+          }
+        ]
+      },
+      {
+        "id": "score-008",
+        "category": "strong_coverage",
+        "expected_min": 90.0,
+        "expected_max": 100.0,
+        "actual_score": 100.0,
+        "in_range": true,
+        "matched_skills": [
+          "Python",
+          "FastAPI",
+          "Redis",
+          "Celery"
+        ],
+        "missing_skills": [],
+        "breakdown": [
+          {
+            "skill": "Python",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "经历：使用 Python 与 FastAPI 提供接口"
+          },
+          {
+            "skill": "FastAPI",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "经历：使用 Python 与 FastAPI 提供接口"
+          },
+          {
+            "skill": "Redis",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "缓存使用 Redis"
+          },
+          {
+            "skill": "Celery",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "异步任务由 Celery 调度"
+          }
+        ]
+      },
+      {
+        "id": "score-009",
+        "category": "strong_coverage",
+        "expected_min": 70.0,
+        "expected_max": 85.0,
+        "actual_score": 80.0,
+        "in_range": true,
+        "matched_skills": [
+          "Python",
+          "Docker",
+          "React",
+          "GraphQL"
+        ],
+        "missing_skills": [
+          "TypeScript"
+        ],
+        "breakdown": [
+          {
+            "skill": "Python",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "经历：使用 Python 编写 GraphQL 服务"
+          },
+          {
+            "skill": "Docker",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "前端有 React 组件经验并用 Docker 发布服务"
+          },
+          {
+            "skill": "React",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "前端有 React 组件经验并用 Docker 发布服务"
+          },
+          {
+            "skill": "TypeScript",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "GraphQL",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "经历：使用 Python 编写 GraphQL 服务"
+          }
+        ]
+      },
+      {
+        "id": "score-010",
+        "category": "strong_coverage",
+        "expected_min": 90.0,
+        "expected_max": 100.0,
+        "actual_score": 100.0,
+        "in_range": true,
+        "matched_skills": [
+          "Python",
+          "Docker",
+          "Kubernetes",
+          "Git"
+        ],
+        "missing_skills": [],
+        "breakdown": [
+          {
+            "skill": "Python",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "经历：编写 Python 运维脚本"
+          },
+          {
+            "skill": "Docker",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "应用使用 Docker 镜像并由 Kubernetes 部署"
+          },
+          {
+            "skill": "Kubernetes",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "应用使用 Docker 镜像并由 Kubernetes 部署"
+          },
+          {
+            "skill": "Git",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "使用 Git 管理"
+          }
+        ]
+      },
+      {
+        "id": "score-011",
+        "category": "strong_coverage",
+        "expected_min": 90.0,
+        "expected_max": 100.0,
+        "actual_score": 100.0,
+        "in_range": true,
+        "matched_skills": [
+          "Python",
+          "MySQL",
+          "Docker",
+          "REST API"
+        ],
+        "missing_skills": [],
+        "breakdown": [
+          {
+            "skill": "Python",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "经历：使用 Python 开发 REST API"
+          },
+          {
+            "skill": "MySQL",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "主要数据库为 MySQL"
+          },
+          {
+            "skill": "Docker",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "并通过 Docker Compose 本地运行"
+          },
+          {
+            "skill": "REST API",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "经历：使用 Python 开发 REST API"
+          }
+        ]
+      },
+      {
+        "id": "score-012",
+        "category": "strong_coverage",
+        "expected_min": 90.0,
+        "expected_max": 100.0,
+        "actual_score": 100.0,
+        "in_range": true,
+        "matched_skills": [
+          "Python",
+          "RAG",
+          "LLM",
+          "Embedding"
+        ],
+        "missing_skills": [],
+        "breakdown": [
+          {
+            "skill": "Python",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "经历：使用 Python 构建 RAG 问答系统"
+          },
+          {
+            "skill": "RAG",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "经历：使用 Python 构建 RAG 问答系统"
+          },
+          {
+            "skill": "LLM",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "负责 Embedding 生成与 LLM 响应组装"
+          },
+          {
+            "skill": "Embedding",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "负责 Embedding 生成与 LLM 响应组装"
+          }
+        ]
+      },
+      {
+        "id": "score-013",
+        "category": "strong_coverage",
+        "expected_min": 90.0,
+        "expected_max": 100.0,
+        "actual_score": 100.0,
+        "in_range": true,
+        "matched_skills": [
+          "Python",
+          "SQL",
+          "Pandas",
+          "NumPy"
+        ],
+        "missing_skills": [],
+        "breakdown": [
+          {
+            "skill": "Python",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "经历：日常使用 SQL 与 Python"
+          },
+          {
+            "skill": "SQL",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "经历：日常使用 SQL 与 Python"
+          },
+          {
+            "skill": "Pandas",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "使用 Pandas 与 NumPy 处理销售分析数据"
+          },
+          {
+            "skill": "NumPy",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "使用 Pandas 与 NumPy 处理销售分析数据"
+          }
+        ]
+      },
+      {
+        "id": "score-014",
+        "category": "strong_coverage",
+        "expected_min": 90.0,
+        "expected_max": 100.0,
+        "actual_score": 100.0,
+        "in_range": true,
+        "matched_skills": [
+          "Python",
+          "Docker",
+          "Git",
+          "pytest"
+        ],
+        "missing_skills": [],
+        "breakdown": [
+          {
+            "skill": "Python",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "经历：使用 Python 与 pytest 编写自动化测试"
+          },
+          {
+            "skill": "Docker",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "测试环境由 Docker 提供"
+          },
+          {
+            "skill": "Git",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "代码通过 Git 管理"
+          },
+          {
+            "skill": "pytest",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "经历：使用 Python 与 pytest 编写自动化测试"
+          }
+        ]
+      },
+      {
+        "id": "score-015",
+        "category": "strong_coverage",
+        "expected_min": 70.0,
+        "expected_max": 80.0,
+        "actual_score": 75.0,
+        "in_range": true,
+        "matched_skills": [
+          "Python",
+          "RAG",
+          "FAISS"
+        ],
+        "missing_skills": [
+          "LangChain"
+        ],
+        "breakdown": [
+          {
+            "skill": "Python",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "经历：使用 Python 与 FAISS 建立向量索引"
+          },
+          {
+            "skill": "LangChain",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "RAG",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "并接入 RAG 查询链路"
+          },
+          {
+            "skill": "FAISS",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "经历：使用 Python 与 FAISS 建立向量索引"
+          }
+        ]
+      },
+      {
+        "id": "score-016",
+        "category": "weak_or_nonmatching",
+        "expected_min": 0.0,
+        "expected_max": 15.0,
+        "actual_score": 0.0,
+        "in_range": true,
+        "matched_skills": [],
+        "missing_skills": [
+          "Python",
+          "FastAPI",
+          "PostgreSQL",
+          "Docker"
+        ],
+        "breakdown": [
+          {
+            "skill": "Python",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "FastAPI",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "PostgreSQL",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "Docker",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          }
+        ]
+      },
+      {
+        "id": "score-017",
+        "category": "weak_or_nonmatching",
+        "expected_min": 0.0,
+        "expected_max": 15.0,
+        "actual_score": 0.0,
+        "in_range": true,
+        "matched_skills": [],
+        "missing_skills": [
+          "Python",
+          "FastAPI",
+          "SQL",
+          "Docker"
+        ],
+        "breakdown": [
+          {
+            "skill": "Python",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "FastAPI",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "SQL",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "Docker",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          }
+        ]
+      },
+      {
+        "id": "score-018",
+        "category": "weak_or_nonmatching",
+        "expected_min": 20.0,
+        "expected_max": 40.0,
+        "actual_score": 25.0,
+        "in_range": true,
+        "matched_skills": [
+          "Python"
+        ],
+        "missing_skills": [
+          "FastAPI",
+          "PostgreSQL",
+          "Redis"
+        ],
+        "breakdown": [
+          {
+            "skill": "Python",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "学习项目：完成 Python 命令行工具"
+          },
+          {
+            "skill": "FastAPI",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "PostgreSQL",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "Redis",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          }
+        ]
+      },
+      {
+        "id": "score-019",
+        "category": "weak_or_nonmatching",
+        "expected_min": 0.0,
+        "expected_max": 10.0,
+        "actual_score": 0.0,
+        "in_range": true,
+        "matched_skills": [],
+        "missing_skills": [
+          "Python",
+          "SQL",
+          "Docker",
+          "Pandas"
+        ],
+        "breakdown": [
+          {
+            "skill": "Python",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "SQL",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "Docker",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "Pandas",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          }
+        ]
+      },
+      {
+        "id": "score-020",
+        "category": "weak_or_nonmatching",
+        "expected_min": 0.0,
+        "expected_max": 15.0,
+        "actual_score": 0.0,
+        "in_range": true,
+        "matched_skills": [],
+        "missing_skills": [
+          "Python",
+          "Docker",
+          "scikit-learn",
+          "PyTorch"
+        ],
+        "breakdown": [
+          {
+            "skill": "Python",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "Docker",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "scikit-learn",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "PyTorch",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          }
+        ]
+      },
+      {
+        "id": "score-021",
+        "category": "weak_or_nonmatching",
+        "expected_min": 0.0,
+        "expected_max": 10.0,
+        "actual_score": 0.0,
+        "in_range": true,
+        "matched_skills": [],
+        "missing_skills": [
+          "Python",
+          "LangGraph",
+          "RAG",
+          "LLM"
+        ],
+        "breakdown": [
+          {
+            "skill": "Python",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "LangGraph",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "RAG",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "LLM",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          }
+        ]
+      },
+      {
+        "id": "score-022",
+        "category": "weak_or_nonmatching",
+        "expected_min": 0.0,
+        "expected_max": 10.0,
+        "actual_score": 0.0,
+        "in_range": true,
+        "matched_skills": [],
+        "missing_skills": [
+          "Python",
+          "SQL",
+          "Docker",
+          "Pandas"
+        ],
+        "breakdown": [
+          {
+            "skill": "Python",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "SQL",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "Docker",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "Pandas",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          }
+        ]
+      },
+      {
+        "id": "score-023",
+        "category": "weak_or_nonmatching",
+        "expected_min": 20.0,
+        "expected_max": 40.0,
+        "actual_score": 25.0,
+        "in_range": true,
+        "matched_skills": [
+          "Python"
+        ],
+        "missing_skills": [
+          "FastAPI",
+          "Redis",
+          "Celery"
+        ],
+        "breakdown": [
+          {
+            "skill": "Python",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "经历：大学课程使用 Python 完成脚本作业"
+          },
+          {
+            "skill": "FastAPI",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "Redis",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "Celery",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          }
+        ]
+      },
+      {
+        "id": "score-024",
+        "category": "weak_or_nonmatching",
+        "expected_min": 0.0,
+        "expected_max": 15.0,
+        "actual_score": 0.0,
+        "in_range": true,
+        "matched_skills": [],
+        "missing_skills": [
+          "Python",
+          "Django",
+          "MySQL",
+          "Docker"
+        ],
+        "breakdown": [
+          {
+            "skill": "Python",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "Django",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "MySQL",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "Docker",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          }
+        ]
+      },
+      {
+        "id": "score-025",
+        "category": "weak_or_nonmatching",
+        "expected_min": 0.0,
+        "expected_max": 10.0,
+        "actual_score": 0.0,
+        "in_range": true,
+        "matched_skills": [],
+        "missing_skills": [
+          "Python",
+          "Docker",
+          "Kubernetes",
+          "Git"
+        ],
+        "breakdown": [
+          {
+            "skill": "Python",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "Docker",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "Kubernetes",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "Git",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          }
+        ]
+      },
+      {
+        "id": "score-026",
+        "category": "weak_or_nonmatching",
+        "expected_min": 0.0,
+        "expected_max": 15.0,
+        "actual_score": 0.0,
+        "in_range": true,
+        "matched_skills": [],
+        "missing_skills": [
+          "Python",
+          "MongoDB",
+          "Docker",
+          "REST API"
+        ],
+        "breakdown": [
+          {
+            "skill": "Python",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "MongoDB",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "Docker",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "REST API",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          }
+        ]
+      },
+      {
+        "id": "score-027",
+        "category": "weak_or_nonmatching",
+        "expected_min": 20.0,
+        "expected_max": 40.0,
+        "actual_score": 25.0,
+        "in_range": true,
+        "matched_skills": [
+          "Python"
+        ],
+        "missing_skills": [
+          "scikit-learn",
+          "PyTorch",
+          "Pandas"
+        ],
+        "breakdown": [
+          {
+            "skill": "Python",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "经历：正在学习 Python 基础语法"
+          },
+          {
+            "skill": "scikit-learn",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "PyTorch",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "Pandas",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          }
+        ]
+      },
+      {
+        "id": "score-028",
+        "category": "weak_or_nonmatching",
+        "expected_min": 20.0,
+        "expected_max": 40.0,
+        "actual_score": 25.0,
+        "in_range": true,
+        "matched_skills": [
+          "Python"
+        ],
+        "missing_skills": [
+          "LangGraph",
+          "Function Calling",
+          "Agent"
+        ],
+        "breakdown": [
+          {
+            "skill": "Python",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "经历：使用 Python 编写过文件整理脚本"
+          },
+          {
+            "skill": "LangGraph",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "Function Calling",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "Agent",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          }
+        ]
+      },
+      {
+        "id": "score-029",
+        "category": "weak_or_nonmatching",
+        "expected_min": 25.0,
+        "expected_max": 40.0,
+        "actual_score": 25.0,
+        "in_range": true,
+        "matched_skills": [
+          "Docker"
+        ],
+        "missing_skills": [
+          "Python",
+          "Kubernetes",
+          "GitHub Actions"
+        ],
+        "breakdown": [
+          {
+            "skill": "Python",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "Docker",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "经历：能阅读并运行 Docker 命令"
+          },
+          {
+            "skill": "Kubernetes",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "GitHub Actions",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          }
+        ]
+      },
+      {
+        "id": "score-030",
+        "category": "weak_or_nonmatching",
+        "expected_min": 20.0,
+        "expected_max": 40.0,
+        "actual_score": 25.0,
+        "in_range": true,
+        "matched_skills": [
+          "Python"
+        ],
+        "missing_skills": [
+          "PostgreSQL",
+          "Redis",
+          "MongoDB"
+        ],
+        "breakdown": [
+          {
+            "skill": "Python",
+            "weight": 3.0,
+            "matched": true,
+            "evidence": "学习过 Python 入门课程"
+          },
+          {
+            "skill": "PostgreSQL",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "Redis",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          },
+          {
+            "skill": "MongoDB",
+            "weight": 3.0,
+            "matched": false,
+            "evidence": ""
+          }
+        ]
+      }
+    ],
+    "alias_cases": [
+      {
+        "pair_id": "sklearn_vs_scikit_learn",
+        "requirement": "scikit-learn",
+        "resume_skill": "sklearn",
+        "should_match": true,
+        "production_matched": true,
+        "exact_baseline_matched": false,
+        "correct": true
+      },
+      {
+        "pair_id": "postgres_vs_postgresql",
+        "requirement": "PostgreSQL",
+        "resume_skill": "postgres",
+        "should_match": true,
+        "production_matched": true,
+        "exact_baseline_matched": false,
+        "correct": true
+      },
+      {
+        "pair_id": "k8s_vs_kubernetes",
+        "requirement": "Kubernetes",
+        "resume_skill": "k8s",
+        "should_match": true,
+        "production_matched": true,
+        "exact_baseline_matched": false,
+        "correct": true
+      },
+      {
+        "pair_id": "torch_vs_pytorch",
+        "requirement": "PyTorch",
+        "resume_skill": "torch",
+        "should_match": true,
+        "production_matched": true,
+        "exact_baseline_matched": false,
+        "correct": true
+      },
+      {
+        "pair_id": "reactjs_vs_react",
+        "requirement": "React",
+        "resume_skill": "reactjs",
+        "should_match": true,
+        "production_matched": true,
+        "exact_baseline_matched": false,
+        "correct": true
+      },
+      {
+        "pair_id": "langchain_vs_langgraph",
+        "requirement": "LangGraph",
+        "resume_skill": "LangChain",
+        "should_match": false,
+        "production_matched": false,
+        "exact_baseline_matched": false,
+        "correct": true
+      },
+      {
+        "pair_id": "java_vs_javascript",
+        "requirement": "Java",
+        "resume_skill": "JavaScript",
+        "should_match": false,
+        "production_matched": false,
+        "exact_baseline_matched": false,
+        "correct": true
+      },
+      {
+        "pair_id": "pytorch_vs_tensorflow",
+        "requirement": "PyTorch",
+        "resume_skill": "TensorFlow",
+        "should_match": false,
+        "production_matched": false,
+        "exact_baseline_matched": false,
+        "correct": true
+      },
+      {
+        "pair_id": "fastapi_vs_django",
+        "requirement": "FastAPI",
+        "resume_skill": "Django",
+        "should_match": false,
+        "production_matched": false,
+        "exact_baseline_matched": false,
+        "correct": true
+      }
+    ],
+    "retrieval_cases": [
+      {
+        "id": "retrieval-001",
+        "query": "Python FastAPI 服务开发",
+        "relevant_ids": [
+          "api"
+        ],
+        "top_k": 3,
+        "hit_ids": [
+          "api",
+          "ops",
+          "invoice"
+        ],
+        "recall_at_k": 1.0,
+        "hits": [
+          {
+            "id": "api",
+            "title": "FastAPI 服务",
+            "content": "使用 Python 和 FastAPI 实现订单 API",
+            "score": 0.03278688524590164,
+            "source": "local-hybrid"
+          },
+          {
+            "id": "ops",
+            "title": "服务器巡检",
+            "content": "维护 Linux 服务器与巡检报告",
+            "score": 0.016129032258064516,
+            "source": "local-hybrid"
+          },
+          {
+            "id": "invoice",
+            "title": "发票整理",
+            "content": "整理电子发票并导出 Excel",
+            "score": 0.015873015873015872,
+            "source": "local-hybrid"
+          }
+        ],
+        "component_recall_at_k": {
+          "bm25": 1.0,
+          "sparse_vector": 1.0
+        }
+      },
+      {
+        "id": "retrieval-002",
+        "query": "LangGraph Agent 状态编排",
+        "relevant_ids": [
+          "langgraph"
+        ],
+        "top_k": 3,
+        "hit_ids": [
+          "langgraph",
+          "langchain"
+        ],
+        "recall_at_k": 1.0,
+        "hits": [
+          {
+            "id": "langgraph",
+            "title": "智能体状态图",
+            "content": "使用 LangGraph 实现 Agent 状态编排和循环控制",
+            "score": 0.03278688524590164,
+            "source": "local-hybrid"
+          },
+          {
+            "id": "langchain",
+            "title": "链式调用",
+            "content": "使用 LangChain 串联提示词和模型调用",
+            "score": 0.016129032258064516,
+            "source": "local-hybrid"
+          }
+        ],
+        "component_recall_at_k": {
+          "bm25": 1.0,
+          "sparse_vector": 1.0
+        }
+      },
+      {
+        "id": "retrieval-003",
+        "query": "scikit-learn 分类模型",
+        "relevant_ids": [
+          "sklearn"
+        ],
+        "top_k": 3,
+        "hit_ids": [
+          "sklearn",
+          "torch"
+        ],
+        "recall_at_k": 1.0,
+        "hits": [
+          {
+            "id": "sklearn",
+            "title": "分类模型",
+            "content": "使用 Python 与 scikit-learn 训练客户流失分类模型",
+            "score": 0.03278688524590164,
+            "source": "local-hybrid"
+          },
+          {
+            "id": "torch",
+            "title": "深度学习",
+            "content": "使用 PyTorch 训练图像分类网络",
+            "score": 0.016129032258064516,
+            "source": "local-hybrid"
+          }
+        ],
+        "component_recall_at_k": {
+          "bm25": 1.0,
+          "sparse_vector": 1.0
+        }
+      },
+      {
+        "id": "retrieval-004",
+        "query": "PostgreSQL 查询优化",
+        "relevant_ids": [
+          "postgres"
+        ],
+        "top_k": 3,
+        "hit_ids": [
+          "postgres"
+        ],
+        "recall_at_k": 1.0,
+        "hits": [
+          {
+            "id": "postgres",
+            "title": "数据库优化",
+            "content": "优化 PostgreSQL 慢查询并调整索引",
+            "score": 0.03278688524590164,
+            "source": "local-hybrid"
+          }
+        ],
+        "component_recall_at_k": {
+          "bm25": 1.0,
+          "sparse_vector": 1.0
+        }
+      },
+      {
+        "id": "retrieval-005",
+        "query": "RAG ChromaDB 证据检索",
+        "relevant_ids": [
+          "rag"
+        ],
+        "top_k": 3,
+        "hit_ids": [
+          "rag",
+          "bm25",
+          "etl"
+        ],
+        "recall_at_k": 1.0,
+        "hits": [
+          {
+            "id": "rag",
+            "title": "RAG 问答",
+            "content": "使用 ChromaDB 存储文档向量并支撑 RAG 问答",
+            "score": 0.03252247488101534,
+            "source": "local-hybrid"
+          },
+          {
+            "id": "bm25",
+            "title": "搜索排序",
+            "content": "使用 BM25 完成关键词检索",
+            "score": 0.01639344262295082,
+            "source": "local-hybrid"
+          },
+          {
+            "id": "etl",
+            "title": "数据管道",
+            "content": "使用 Python 定时同步业务数据",
+            "score": 0.015873015873015872,
+            "source": "local-hybrid"
+          }
+        ],
+        "component_recall_at_k": {
+          "bm25": 1.0,
+          "sparse_vector": 1.0
+        }
+      },
+      {
+        "id": "retrieval-006",
+        "query": "Kafka 实时数据管道",
+        "relevant_ids": [
+          "kafka"
+        ],
+        "top_k": 3,
+        "hit_ids": [
+          "kafka",
+          "batch"
+        ],
+        "recall_at_k": 1.0,
+        "hits": [
+          {
+            "id": "kafka",
+            "title": "实时管道",
+            "content": "使用 Python 消费 Kafka 事件并写入数据仓库",
+            "score": 0.03278688524590164,
+            "source": "local-hybrid"
+          },
+          {
+            "id": "batch",
+            "title": "离线任务",
+            "content": "每日批量导出 CSV 文件",
+            "score": 0.016129032258064516,
+            "source": "local-hybrid"
+          }
+        ],
+        "component_recall_at_k": {
+          "bm25": 1.0,
+          "sparse_vector": 1.0
+        }
+      },
+      {
+        "id": "retrieval-007",
+        "query": "Redis 缓存加速",
+        "relevant_ids": [
+          "redis"
+        ],
+        "top_k": 3,
+        "hit_ids": [
+          "redis",
+          "mongo"
+        ],
+        "recall_at_k": 1.0,
+        "hits": [
+          {
+            "id": "redis",
+            "title": "缓存实践",
+            "content": "使用 Redis 缓存热点数据并降低数据库压力",
+            "score": 0.03278688524590164,
+            "source": "local-hybrid"
+          },
+          {
+            "id": "mongo",
+            "title": "文档库",
+            "content": "使用 MongoDB 存储用户行为事件",
+            "score": 0.016129032258064516,
+            "source": "local-hybrid"
+          }
+        ],
+        "component_recall_at_k": {
+          "bm25": 1.0,
+          "sparse_vector": 1.0
+        }
+      },
+      {
+        "id": "retrieval-008",
+        "query": "Docker Kubernetes 部署",
+        "relevant_ids": [
+          "deploy"
+        ],
+        "top_k": 3,
+        "hit_ids": [
+          "deploy"
+        ],
+        "recall_at_k": 1.0,
+        "hits": [
+          {
+            "id": "deploy",
+            "title": "容器部署",
+            "content": "使用 Docker 打包服务并部署到 Kubernetes",
+            "score": 0.03278688524590164,
+            "source": "local-hybrid"
+          }
+        ],
+        "component_recall_at_k": {
+          "bm25": 1.0,
+          "sparse_vector": 1.0
+        }
+      }
+    ]
+  },
+  "limitations": [
+    "All score and retrieval fixtures are synthetic; expected ranges and relevant_ids are hand-authored project test expectations, not human real annotations.",
+    "Offline evaluation makes no hosted-model calls and reports no Token counts or costs.",
+    "Default retrieval is local-hybrid only; BGE/Chroma reranking was not run and no BGE quality or latency is claimed.",
+    "BM25 and sparse_vector component Recall@k use actual helpers from the current local retriever; a separate dense-vector baseline is not measured in local mode.",
+    "Timings are local wall-clock perf_counter measurements and will vary between runs."
+  ],
+  "timing": {
+    "parser_and_scoring_seconds": 0.252569800009951,
+    "alias_seconds": 0.001070900005288422,
+    "retrieval_seconds": 3.461442599975271,
+    "total_seconds": 3.715124199981801
+  },
+  "thresholds": {
+    "minimum_score_accuracy": 0.8,
+    "actual_score_accuracy": 1.0,
+    "passed": true
+  }
+}
