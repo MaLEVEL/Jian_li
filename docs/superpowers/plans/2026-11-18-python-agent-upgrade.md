@@ -28,7 +28,7 @@
 ## Task 4: Evaluation, packaging, handover
 - [x] 创建 30 条合成评分回归样本与检索相关性样本，输出评分区间命中率、别名命中率、检索 Recall@k 和耗时。
 - [x] Dockerfile、compose、.env.example、CI、Windows 启动文档和 README 架构/面试说明。
-- [ ] 跑全部验证，审查差异和密钥排除，分阶段 commit 并 push 到用户仓库，核对远端提交。
+- [x] 跑全部验证，审查差异和密钥排除，分阶段 commit 并 push 到用户仓库，核对远端提交。实现快照 b33361b 已推送 origin/main，git ls-remote 与本地 HEAD 一致；后续交付记录作为独立文档提交。
 
 ## Task 5: 用户追加的运行时业务 Skills
 - [x] 三个能力包：JD 拆解匹配、简历定制改写、面试知识点与预测练习题。
