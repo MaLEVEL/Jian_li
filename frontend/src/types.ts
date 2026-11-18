@@ -1,4 +1,4 @@
-export type TabId = "workspace" | "profile" | "builder" | "optimizer" | "applications";
+export type TabId = "workspace" | "agent" | "profile" | "builder" | "optimizer" | "applications";
 
 export type ResumeSource = "generated" | "optimized" | "uploaded";
 

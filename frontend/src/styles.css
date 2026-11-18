@@ -67,6 +67,7 @@ button {
 
 .sidebar {
   position: sticky;
+  min-width: 0;
   top: 20px;
   align-self: start;
   min-height: calc(100vh - 40px);

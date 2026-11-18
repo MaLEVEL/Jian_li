@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  Bot,
   BriefcaseBusiness,
   Download,
   LayoutDashboard,
@@ -47,6 +48,7 @@ import type {
   ResumeVersion,
   TabId,
 } from "./types";
+import { AgentWorkspace } from "./components/AgentWorkspace";
 import { ApplicationsView, BuilderView, OptimizerView, ProfileView, WorkspaceView } from "./views";
 
 function normalizeJobKey(job: JobDraft) {
@@ -877,6 +879,9 @@ export default function App() {
           <NavButton active={activeTab === "workspace"} icon={<LayoutDashboard size={18} />} onClick={() => setActiveTab("workspace")}>
             工作台
           </NavButton>
+          <NavButton active={activeTab === "agent"} icon={<Bot size={18} />} onClick={() => setActiveTab("agent")}>
+            Python/Agent 工作台
+          </NavButton>
           <NavButton active={activeTab === "profile"} icon={<Library size={18} />} onClick={() => setActiveTab("profile")}>
             经历库
           </NavButton>
@@ -884,7 +889,7 @@ export default function App() {
             简历版本
           </NavButton>
           <NavButton active={activeTab === "optimizer"} icon={<Search size={18} />} onClick={() => setActiveTab("optimizer")}>
-            JD 匹配
+            JD 匹配（本地规则）
           </NavButton>
           <NavButton active={activeTab === "applications"} icon={<BriefcaseBusiness size={18} />} onClick={() => setActiveTab("applications")}>
             投递管理
@@ -892,7 +897,7 @@ export default function App() {
         </nav>
         <div className="sidebar-note">
           <AlertTriangle size={16} />
-          <span>纯前端演示版：数据仅保存在本浏览器，生成和匹配由本地规则模拟，不会上传简历。</span>
+          <span>原有简历与投递数据保存在本浏览器；Python/Agent 工作台会调用本地 FastAPI，并在页面显示实际运行模式。</span>
         </div>
       </aside>
 
@@ -942,6 +947,15 @@ export default function App() {
             onGo={setActiveTab}
             onLoadSampleUser={loadSampleUser}
             onRunDemoFlow={runDemoFlow}
+          />
+        ) : null}
+
+        {activeTab === "agent" ? (
+          <AgentWorkspace
+            profile={profile}
+            resumes={resumes}
+            selectedResumeId={selectedResumeId}
+            onSelectResume={setSelectedResumeId}
           />
         ) : null}
 
