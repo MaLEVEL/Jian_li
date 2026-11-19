@@ -13,6 +13,7 @@
 - 素材 RAG：真实经历素材、BM25 + 向量双路召回 + RRF、建议引用；没有依据只给学习计划。
 - 最多 20 个 JD 批量排序，限制并发、单项失败隔离、CSV 导出。
 - SQLite 持久化素材和分析历史，报告展示模型模式、警告、耗时和 Token。
+- BOSS 接入中心：通过本机 Docker 服务和 Chrome/Edge 扩展采集当前可见职位，进入 SQLite 职位池后可直接带入 JD 匹配、简历定制和投递管理；密钥仅保存在浏览器。详见 [BOSS 接入教程](docs/boss-integration.md)。
 - 运行时业务 Skills：JD 拆解与诊断、真实经历简历定制、面试速学与预测练习题，结果按分析报告保存，详见 [业务技能](docs/business-skills.md)。
 - 模板与提纲：16 种中文简历版式，覆盖校招、实习、社招、技术研发、产品运营、设计创意、管理咨询和学术科研 8 类人群；提供 10 类岗位内容框架、筛选、来源说明和 Markdown 提纲复制。[产品参考与原创资产](docs/product-references.md)。
 - 全站采用天蓝色作品集风格和顶部导航；桌面与手机都通过编辑/预览标签切换。简历支持单页/双页页面容量、字体、字号、行距、页边距和主题色；外观设置随版本保存，字体、字号、行距、页边距与主题色同步到 DOCX 和浏览器 PDF，页面容量用于预览、质量估算与打印检查。
@@ -57,11 +58,11 @@ flowchart LR
 git clone https://github.com/MaLEVEL/Jian_li.git
 cd Jian_li
 Copy-Item .env.example .env
-# 编辑根目录 .env；不填密钥也能离线运行
+# 编辑根目录 .env；模型密钥在网页的“API 配置”中填写
 powershell -ExecutionPolicy Bypass -File scripts/start.ps1
 ```
 
-页面：http://127.0.0.1:8000 ，接口文档：http://127.0.0.1:8000/docs 。脚本安装后端、构建前端，由 FastAPI 同源提供页面。
+页面：http://127.0.0.1:18001 ，接口文档：http://127.0.0.1:18001/docs 。脚本安装后端、构建前端，由 FastAPI 同源提供页面。
 
 开发模式：
 
@@ -69,30 +70,26 @@ powershell -ExecutionPolicy Bypass -File scripts/start.ps1
 python -m venv .venv
 .venv\Scripts\python.exe -m pip install -r backend/requirements-dev.txt
 $env:PYTHONPATH = 'backend'
-.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 127.0.0.1 --port 18001
 # 另一个终端
 cd frontend
 npm.cmd ci
 npm.cmd run dev
 ```
 
-开发页面 http://localhost:5173 ，Vite 将 /api 代理到本地 8000 端口。Linux/macOS 使用 .venv/bin/python 执行对应命令。
+开发页面 http://localhost:5173 ，Vite 将 /api 代理到本地 18001 端口。Linux/macOS 使用 .venv/bin/python 执行对应命令。
 
 ## 智谱模型配置
 
-根目录 .env：
+推荐在网页顶部进入“BOSS 接入 → API 配置”，填写兼容 OpenAI Chat Completions 的请求地址、模型名和自己的密钥。默认请求地址为：
 
-```dotenv
-JOBFIT_API_KEY=填写自己的智谱密钥
-JOBFIT_BASE_URL=https://open.bigmodel.cn/api/paas/v4/
-JOBFIT_MODEL=glm-4-flash
-JOBFIT_LLM_MODE=auto
-JOBFIT_RAG_MODE=local
+```text
+https://open.bigmodel.cn/api/paas/v4/
 ```
 
-官方兼容地址为 /api/paas/v4/，模型名需使用你的账户可用型号，示例不承诺长期免费或可用。官方说明：https://docs.bigmodel.cn/cn/guide/develop/openai/introduction 。密钥仅后端读取，不进浏览器或 Git，修改后重启后端。
+模型名需使用你的账户可用型号，示例不承诺长期免费或可用。官方说明：https://docs.bigmodel.cn/cn/guide/develop/openai/introduction 。API Key 只保存在当前浏览器 localStorage；分析请求时临时放入发往本机后端的请求头，不写入 SQLite、JSON 备份、容器环境变量、日志或 Git。
 
-模式：auto 有密钥时在线，无密钥离线；offline 强制离线；online 在缺少密钥时同样明确报告 offline。上游超时、限流、无效 JSON 有限重试，401 不重试；失败呈现 degraded 与具体警告，不伪造成功。
+根目录 `.env` 只保留端口、数据目录、检索模式和局域网绑定等部署参数，不需要也不会读取 `JOBFIT_API_KEY`。浏览器未配置完整的三项模型设置时，系统明确使用离线规则模式。上游超时、限流、无效 JSON 有限重试，401 不重试；失败呈现 degraded 与具体警告，不伪造成功。
 
 ## 可选 BGE 检索
 
@@ -111,7 +108,7 @@ docker compose logs -f
 docker compose down
 ```
 
-页面仍为 http://127.0.0.1:8000 。命名卷 jobfit-data 保存素材和报告；down 保留数据，down -v 删除数据。端口默认只绑定本机。若 8000 被占用，可在 .env 设置 JOBFIT_PORT=18001；脚本启动可用 scripts/start.ps1 -Port 18001。
+页面仍为 http://127.0.0.1:18001 。命名卷 jobfit-data 保存素材和报告；down 保留数据，down -v 删除数据。端口默认只绑定本机。若 18001 被占用，可在 .env 设置其他 `JOBFIT_PORT`。可信局域网跨设备时同时设置 `JOBFIT_BIND_HOST=0.0.0.0` 与 `JOBFIT_ALLOWED_HOSTS=主机局域网IP或私有DNS名`，并且只通过该明确地址访问。Host 白名单禁止 `*`，不要直接暴露公网。脚本启动也可用 `scripts/start.ps1 -Port 18001`。
 
 ## API
 
@@ -123,6 +120,9 @@ docker compose down
 | POST | /api/batch | 1–20 个岗位分析排序 |
 | POST | /api/batch/export | 批量分析与安全 CSV |
 | GET/POST | /api/materials | 素材列表/新增 |
+| GET/POST/DELETE | /api/boss/jobs | BOSS 职位池 |
+| GET/PUT | /api/workspace | 单用户跨设备工作区同步 |
+| POST | /api/provider/test | 临时测试浏览器配置的模型接口 |
 | DELETE | /api/materials/{id} | 删除素材 |
 | GET | /api/history | 最近 100 条报告 |
 | GET | /api/history/{id} | 报告详情 |
@@ -164,4 +164,4 @@ npm.cmd run build
 
 可写：基于 Python、FastAPI 与 LangGraph 构建 JD–Resume 分析工作流，完成结构化解析、可解释加权评分、素材混合检索与有据建议；复用 React 简历前端，支持最多 20 岗位批量排序、SQLite 历史、节点/Token 观测及 Docker。
 
-这是本地单用户工具，尚无登录、多租户和公网访问控制。简历/投递保存在浏览器，Agent 素材/报告保存在 SQLite；在线模式将发送数据到配置的模型服务。面试技术边界见 [面试说明](docs/interview-guide.md)。
+这是本地单用户工具，尚无登录、多租户和公网访问控制。简历、投递和 BOSS 职位通过本机 SQLite 同步，浏览器 localStorage 保留离线副本；Host 与 Origin 白名单用于降低 DNS rebinding 和跨站写入风险。在线模式只把请求所需内容发往用户配置的模型服务。面试技术边界见 [面试说明](docs/interview-guide.md)。

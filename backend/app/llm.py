@@ -1,5 +1,6 @@
 import asyncio
 import json
+import socket
 from pathlib import Path
 from typing import TypeVar
 
@@ -7,6 +8,8 @@ import httpx
 from pydantic import BaseModel, ValidationError
 
 from .config import Settings
+from .provider_probe import PinnedProviderTransport
+from .url_safety import UnsafeProviderURL, resolve_provider_endpoint
 
 T = TypeVar('T', bound=BaseModel)
 PROMPTS = Path(__file__).parent / 'prompts'
@@ -34,6 +37,12 @@ class ModelClient:
     ) -> T:
         if not self.settings.online:
             raise ModelUnavailable('未启用真实模型或未配置 API Key')
+        try:
+            endpoint = await asyncio.to_thread(resolve_provider_endpoint, self.settings.base_url)
+        except UnsafeProviderURL:
+            raise ModelUnavailable('模型服务地址不安全，已拒绝连接') from None
+        except socket.gaierror:
+            raise ModelUnavailable('模型服务域名无法解析') from None
         prompt = (PROMPTS / f'{prompt_name}.txt').read_text(encoding='utf-8')
         schema_text = 'JSON Schema:\n' + json.dumps(schema.model_json_schema(), ensure_ascii=False)
         system_content = f'{system_instructions.strip()}\n---\n{prompt}\n{schema_text}' if system_instructions else (
@@ -52,7 +61,18 @@ class ModelClient:
         if self.settings.reasoning_effort:
             body['reasoning_effort'] = self.settings.reasoning_effort
         headers = {'Authorization': 'Bearer ' + self.settings.api_key.get_secret_value()}
-        async with httpx.AsyncClient(timeout=self.settings.timeout_seconds, transport=self.transport) as client:
+        client_transport = self.transport
+        if client_transport is None:
+            client_transport = PinnedProviderTransport(
+                httpx.AsyncHTTPTransport(trust_env=False),
+                endpoint,
+            )
+        async with httpx.AsyncClient(
+            timeout=self.settings.timeout_seconds,
+            transport=client_transport,
+            follow_redirects=False,
+            trust_env=False,
+        ) as client:
             for attempt in range(self.settings.max_retries + 1):
                 try:
                     self.calls += 1

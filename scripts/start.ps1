@@ -1,4 +1,4 @@
-param([int]$Port = 8000)
+param([int]$Port = 18001)
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $projectRoot

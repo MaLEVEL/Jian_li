@@ -52,7 +52,10 @@ async def test_chunked_oversized_multipart_is_rejected_without_content_length(tm
             "POST",
             "http://testserver/api/parse/resume",
             stream=SingleChunkStream(body),
-            headers={"Content-Type": "multipart/form-data; boundary=jobfit-upload-test"},
+            headers={
+                "Host": "testserver",
+                "Content-Type": "multipart/form-data; boundary=jobfit-upload-test",
+            },
         )
         request.headers.pop("content-length", None)
         response = await client.send(request)

@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>JobFit BOSS 职位采集器</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main class="panel">
+      <header class="header">
+        <div class="brand-mark" aria-hidden="true">JF</div>
+        <div>
+          <p class="eyebrow">JOBFIT COLLECTOR</p>
+          <h1>BOSS 职位采集</h1>
+        </div>
+      </header>
+
+      <section class="service-card" aria-labelledby="service-title">
+        <div class="section-heading">
+          <h2 id="service-title">本机服务</h2>
+          <span id="health-badge" class="badge badge-idle">未检测</span>
+        </div>
+        <label for="server-url">服务地址</label>
+        <input id="server-url" type="url" inputmode="url" spellcheck="false" placeholder="http://127.0.0.1:18001">
+        <button id="test-health" class="button button-secondary" type="button">测试连接</button>
+      </section>
+
+      <section class="collect-card" aria-labelledby="collect-title">
+        <div class="section-heading">
+          <h2 id="collect-title">当前可见职位</h2>
+          <span class="scope-label">仅当前页</span>
+        </div>
+        <p class="hint">打开 BOSS 搜索结果或职位详情，等待内容显示后再采集。</p>
+        <div class="counts" aria-live="polite">
+          <div class="count-item">
+            <span>处理总数</span>
+            <strong id="total-count">—</strong>
+          </div>
+          <div class="count-item">
+            <span>新增</span>
+            <strong id="imported-count">—</strong>
+          </div>
+          <div class="count-item">
+            <span>更新</span>
+            <strong id="updated-count">—</strong>
+          </div>
+        </div>
+        <button id="collect-jobs" class="button button-primary" type="button">采集当前页</button>
+      </section>
+
+      <p id="status" class="status" role="alert" aria-live="polite"></p>
+      <p class="privacy-note">采集结果会发送到你配置的本机 JobFit 服务。此扩展不会自动投递简历。</p>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

@@ -5,8 +5,10 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 from time import perf_counter
+from urllib.parse import urlsplit
 from uuid import uuid4
 
+import httpx
 from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,8 +18,20 @@ from pypdf import PdfReader
 from .business_skills import get_skill, list_skills, run_skill
 from .config import ROOT, Settings
 from .graph import run_analysis
+from .provider_probe import ProviderTestFailure, probe_provider
 from .rag import MaterialRetriever
-from .schemas import AnalyzeRequest, BatchRequest, MaterialInput, SkillRunRequest
+from .request_settings import request_settings, required_request_settings
+from .schemas import (
+    AnalyzeRequest,
+    BatchRequest,
+    BossJobBatchInput,
+    BossJobImportResult,
+    BossJobRecord,
+    MaterialInput,
+    SkillRunRequest,
+    WorkspaceEnvelope,
+    WorkspacePutRequest,
+)
 from .store import Store
 from .upload_limit import UploadBodyLimitMiddleware
 
@@ -30,7 +44,20 @@ def csv_safe(value) -> str:
     return "'" + text if text.lstrip().startswith(('=', '+', '-', '@')) else text
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def normalized_request_host(value: str) -> str:
+    try:
+        parsed = urlsplit('//' + value.strip())
+        if parsed.username is not None or parsed.password is not None or parsed.path not in ('', '/'):
+            return ''
+        return (parsed.hostname or '').casefold().rstrip('.')
+    except ValueError:
+        return ''
+
+
+def create_app(
+    settings: Settings | None = None,
+    provider_transport: httpx.AsyncBaseTransport | None = None,
+) -> FastAPI:
     config = settings or Settings()
     store = Store(config.data_dir / 'jobfit.sqlite3')
     retriever = MaterialRetriever(mode=config.rag_mode, persist_directory=str(config.data_dir / 'chroma'))
@@ -42,16 +69,51 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application = FastAPI(title='JobFit AI Agent', version='1.0.0', lifespan=lifespan)
     application.state.store = store
     application.state.settings = config
-    application.add_middleware(CORSMiddleware,
-        allow_origins=[value.strip() for value in config.cors_origins.split(',') if value.strip()],
-        allow_methods=['GET', 'POST', 'DELETE'], allow_headers=['Content-Type'])
+    application.state.provider_transport = provider_transport
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=config.cors_origin_list,
+        allow_methods=['GET', 'POST', 'PUT', 'DELETE'],
+        allow_headers=['Content-Type', 'X-API-Key', 'X-API-Base-URL', 'X-Model'],
+        expose_headers=['X-Total-Count', 'X-Limit', 'X-Offset', 'X-Request-ID'],
+    )
     application.add_middleware(UploadBodyLimitMiddleware)
 
     @application.middleware('http')
     async def request_log(request: Request, call_next):
         begin = perf_counter()
         request_id = uuid4().hex[:12]
-        response = await call_next(request)
+        host = request.headers.get('host', '')
+        hostname = normalized_request_host(host)
+        if hostname not in config.allowed_host_list:
+            response = JSONResponse(
+                status_code=400,
+                content={'detail': '请求 Host 不在允许列表中。请配置 JOBFIT_ALLOWED_HOSTS。'},
+            )
+        else:
+            origin = request.headers.get('origin')
+            state_changing = request.method in {'POST', 'PUT', 'PATCH', 'DELETE'}
+            same_origin = False
+            if origin:
+                try:
+                    parsed_origin = urlsplit(origin)
+                    same_origin = (
+                        parsed_origin.scheme == request.url.scheme
+                        and request.url.scheme in {'http', 'https'}
+                        and (parsed_origin.hostname or '').casefold().rstrip('.') == hostname
+                        and parsed_origin.port == request.url.port
+                    )
+                except ValueError:
+                    same_origin = False
+            if state_changing and origin and not same_origin and origin not in config.cors_origin_list:
+                # The trusted Host allowlist blocks DNS rebinding before Origin checks.
+                # Mutations additionally require an exact origin or the trusted same origin.
+                response = JSONResponse(
+                    status_code=403,
+                    content={'detail': '请求来源不在允许列表中。'},
+                )
+            else:
+                response = await call_next(request)
         response.headers['X-Request-ID'] = request_id
         logger.info('request=%s method=%s status=%s duration_ms=%.1f',
                     request_id, request.method, response.status_code, (perf_counter() - begin) * 1000)
@@ -59,7 +121,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @application.exception_handler(RequestValidationError)
     async def invalid_request(request, error):
-        return JSONResponse(status_code=422, content={'detail': '输入无效：请检查必填文本、字段长度、文件格式和批量数量（1–20 条）。'})
+        return JSONResponse(status_code=422, content={'detail': '输入无效：请检查必填字段、文本长度、URL、文件格式和批量数量限制。'})
 
     @application.exception_handler(Exception)
     async def unexpected_error(request, error):
@@ -70,6 +132,78 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def health():
         return {'status': 'ok', 'mode': 'online' if config.online else 'offline',
                 'model': config.model if config.online else 'offline-rules', 'rag_mode': retriever.mode}
+
+    @application.get('/api/workspace', response_model=WorkspaceEnvelope)
+    def workspace():
+        value = store.workspace_state()
+        if value is None:
+            raise HTTPException(404, '工作区快照不存在')
+        return value
+
+    @application.put('/api/workspace', response_model=WorkspaceEnvelope)
+    def save_workspace(data: WorkspacePutRequest):
+        saved, current = store.save_workspace_state(
+            data.state.model_dump(mode='json'),
+            data.expected_revision,
+        )
+        if not saved:
+            if current is None:
+                raise HTTPException(409, '工作区版本冲突，请重新加载。')
+            return JSONResponse(
+                status_code=409,
+                content={'detail': '服务器工作区已被更新。', 'current': current},
+            )
+        return current
+
+    @application.post('/api/provider/test')
+    async def provider_test(request: Request):
+        settings = required_request_settings(request, config)
+        try:
+            return await probe_provider(settings, application.state.provider_transport)
+        except ProviderTestFailure as error:
+            raise HTTPException(error.status_code, error.detail) from None
+
+    @application.post(
+        '/api/boss/jobs/import',
+        response_model=BossJobImportResult,
+        response_model_exclude_none=True,
+    )
+    def import_boss_jobs(data: BossJobBatchInput):
+        return store.upsert_boss_jobs([job.model_dump(mode='json') for job in data.jobs])
+
+    @application.get('/api/boss/jobs', response_model=list[BossJobRecord])
+    def boss_jobs(
+        response: Response,
+        limit: int = Query(default=50, ge=1, le=200),
+        offset: int = Query(default=0, ge=0, le=1_000_000),
+    ):
+        total = store.boss_job_count()
+        response.headers['X-Total-Count'] = str(total)
+        response.headers['X-Limit'] = str(limit)
+        response.headers['X-Offset'] = str(offset)
+        return store.boss_jobs(limit=limit, offset=offset)
+
+    @application.get('/api/boss/jobs/{job_id}', response_model=BossJobRecord)
+    def boss_job(job_id: str):
+        value = store.boss_job(job_id)
+        if not value:
+            raise HTTPException(404, 'BOSS 职位不存在')
+        return value
+
+    @application.delete('/api/boss/jobs/{job_id}', status_code=204)
+    def delete_boss_job(job_id: str):
+        if not store.delete_boss_job(job_id):
+            raise HTTPException(404, 'BOSS 职位不存在')
+        return Response(status_code=204)
+
+    @application.get('/api/boss/health')
+    def boss_health():
+        return {
+            'status': 'ok',
+            'source': 'boss',
+            'count': store.boss_job_count(),
+            'capabilities': ['import', 'list', 'get', 'delete'],
+        }
 
     @application.get('/api/materials')
     def materials():
@@ -86,17 +220,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return Response(status_code=204)
 
     @application.post('/api/analyze')
-    async def analyze(data: AnalyzeRequest):
-        return await run_analysis(data, config, store, retriever)
+    async def analyze(data: AnalyzeRequest, request: Request):
+        return await run_analysis(data, request_settings(request, config), store, retriever)
 
-    async def execute_batch(data: BatchRequest):
-        semaphore = asyncio.Semaphore(config.batch_concurrency)
+    async def execute_batch(data: BatchRequest, settings: Settings):
+        semaphore = asyncio.Semaphore(settings.batch_concurrency)
 
         async def one(index, job):
             async with semaphore:
                 try:
-                    report = await run_analysis(AnalyzeRequest(resume_text=data.resume_text, **job.model_dump()),
-                                                config, store, retriever)
+                    report = await run_analysis(
+                        AnalyzeRequest(resume_text=data.resume_text, **job.model_dump()),
+                        settings,
+                        store,
+                        retriever,
+                    )
                     return report, None
                 except Exception:
                     logger.warning('Batch item failed index=%d', index)
@@ -107,12 +245,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return {'results': results, 'errors': [error for _, error in pairs if error is not None]}
 
     @application.post('/api/batch')
-    async def batch(data: BatchRequest):
-        return await execute_batch(data)
+    async def batch(data: BatchRequest, request: Request):
+        return await execute_batch(data, request_settings(request, config))
 
     @application.post('/api/batch/export')
-    async def batch_export(data: BatchRequest):
-        output = await execute_batch(data)
+    async def batch_export(data: BatchRequest, request: Request):
+        output = await execute_batch(data, request_settings(request, config))
         buffer = io.StringIO(newline='')
         writer = csv.writer(buffer)
         writer.writerow(['公司', '岗位', '匹配分', '缺失技能', '模式', '报告ID', '错误'])
@@ -141,7 +279,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return [skill.model_dump() for skill in list_skills()]
 
     @application.post('/api/skills/{skill_id}/run')
-    async def run_business_skill(skill_id: str, data: SkillRunRequest):
+    async def run_business_skill(skill_id: str, data: SkillRunRequest, request: Request):
         try:
             package = get_skill(skill_id)
         except KeyError:
@@ -149,7 +287,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         analysis = store.analysis(data.analysis_id)
         if not analysis:
             raise HTTPException(404, '分析报告不存在')
-        return await run_skill(package, analysis, config, store)
+        return await run_skill(package, analysis, request_settings(request, config), store)
 
     @application.get('/api/skill-runs')
     def skill_runs(analysis_id: str = Query(min_length=1, max_length=64)):

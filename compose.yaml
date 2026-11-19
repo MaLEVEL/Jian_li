@@ -2,17 +2,18 @@ services:
   jobfit:
     build: .
     ports:
-      - "127.0.0.1:${JOBFIT_PORT:-8000}:8000"
+      - "${JOBFIT_BIND_HOST:-127.0.0.1}:${JOBFIT_PORT:-18001}:8000"
     environment:
-      JOBFIT_API_KEY: ${JOBFIT_API_KEY:-}
       JOBFIT_BASE_URL: ${JOBFIT_BASE_URL:-https://open.bigmodel.cn/api/paas/v4/}
       JOBFIT_MODEL: ${JOBFIT_MODEL:-glm-4-flash}
       JOBFIT_LLM_MODE: ${JOBFIT_LLM_MODE:-auto}
-      JOBFIT_TIMEOUT_SECONDS: ${JOBFIT_TIMEOUT_SECONDS:-30}
+      JOBFIT_TIMEOUT_SECONDS: ${JOBFIT_TIMEOUT_SECONDS:-60}
       JOBFIT_MAX_RETRIES: ${JOBFIT_MAX_RETRIES:-2}
       JOBFIT_REASONING_EFFORT: ${JOBFIT_REASONING_EFFORT:-}
       JOBFIT_RAG_MODE: local
       JOBFIT_DATA_DIR: /app/data
+      JOBFIT_ALLOWED_HOSTS: ${JOBFIT_ALLOWED_HOSTS:-127.0.0.1,localhost,::1}
+      JOBFIT_CORS_ORIGINS: ${JOBFIT_CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,chrome-extension://jdacbgmhcbpkoccblehfahhoekjiiopl}
     volumes:
       - jobfit-data:/app/data
     restart: unless-stopped

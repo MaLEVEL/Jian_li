@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "JobFit BOSS 职位采集器",
+  "version": "1.0.0",
+  "description": "采集用户当前打开的 BOSS 直聘页面中已显示的职位，并导入本机 JobFit 服务。",
+  "permissions": [
+    "storage",
+    "scripting",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1/*",
+    "http://localhost/*"
+  ],
+  "action": {
+    "default_title": "采集 BOSS 当前页职位",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArYjK5Eo1dv9mUThKAMK5tAhAGjoFlEs91pT6C/nh4nQrcHCjngkc3VGivNcxexAo0TyukIv+19HehxE1nNym78SJxe1ep062p9MiViOwW4Z9Tg0oLLu6MJYmVFPAt2eky7dl1cuh0AQh3RmqKLzVXAJeNPqxI5JTIoQLmdW8VzRDw/2vfyt3GeUKWC5LhfOAGGz/M1Y7unxP24LzG5OGxDP8FL1kyOBC3klnMwe+Y50IMi7nHdQL7qyy2/x5J4D3PhnISV47YfSYv3GO9yPgeSJpmpfUhbicKRscEzz49kh4bLATnbRRnMQtaoC0qRrmIQZtz/Z99SYXlM5ZGXGjmQIDAQAB",
+  "optional_host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ]
+}

@@ -5,6 +5,7 @@ import pytest
 from app.config import Settings
 from app.llm import ModelClient, ModelUnavailable
 from app.schemas import JobParsed
+from app.url_safety import ResolvedProviderEndpoint
 
 
 @pytest.mark.asyncio
@@ -136,3 +137,45 @@ async def test_malformed_choice_shapes_degrade_once_and_keep_usage(choice):
         await client.complete('jd', 'Python', JobParsed)
     assert len(requests) == 1
     assert client.usage == {'prompt_tokens': 11, 'completion_tokens': 7, 'total_tokens': 18}
+
+
+@pytest.mark.asyncio
+async def test_model_client_pins_requests_to_the_validated_ip(monkeypatch):
+    captured = []
+    endpoint = ResolvedProviderEndpoint(
+        scheme='https',
+        hostname='provider.example',
+        port=443,
+        addresses=('93.184.216.34',),
+        host_header='provider.example',
+        sni_hostname='provider.example',
+    )
+    monkeypatch.setattr('app.llm.resolve_provider_endpoint', lambda _value: endpoint)
+
+    def fake_transport(*, trust_env):
+        assert trust_env is False
+
+        def handler(request):
+            captured.append(request)
+            return httpx.Response(200, json={
+                'choices': [{'message': {'content': '{"skills":[{"name":"Python"}]}'}}],
+                'usage': {'prompt_tokens': 2, 'completion_tokens': 1},
+            })
+
+        return httpx.MockTransport(handler)
+
+    monkeypatch.setattr('app.llm.httpx.AsyncHTTPTransport', fake_transport)
+    client = ModelClient(Settings(
+        _env_file=None,
+        api_key='pinned-secret',
+        base_url='https://provider.example/v1/',
+        llm_mode='online',
+        max_retries=0,
+    ), transport=None, retry_delay=0)
+
+    await client.complete('jd', 'Python', JobParsed)
+
+    assert len(captured) == 1
+    assert captured[0].url.host == '93.184.216.34'
+    assert captured[0].headers['host'] == 'provider.example'
+    assert captured[0].extensions['sni_hostname'] == 'provider.example'

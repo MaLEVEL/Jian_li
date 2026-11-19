@@ -40,7 +40,7 @@ function buildResume(template: ResumeVersion["template"]): ResumeVersion {
 
 describe("navigation contract for parent integration", () => {
   it("includes the independent templates tab", () => {
-    const tabs: TabId[] = ["workspace", "agent", "templates", "profile", "builder", "optimizer", "applications"];
+    const tabs: TabId[] = ["workspace", "integration", "agent", "templates", "profile", "builder", "optimizer", "applications"];
     expect(tabs).toContain("templates");
   });
 });

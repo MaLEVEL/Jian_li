@@ -1,0 +1,8 @@
+{
+  "name": "jobfit-boss-extension",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "node tests/parser.test.mjs && node tests/manifest.test.mjs"
+  }
+}

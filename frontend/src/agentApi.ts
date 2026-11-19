@@ -1,3 +1,4 @@
+import { isTrustedLocalServiceUrl, loadProviderSettings, type ProviderSettings } from "./bossIntegration";
 import type {
   AgentHealth,
   Analysis,
@@ -27,6 +28,7 @@ export const MAX_BATCH_JOBS = 20;
 
 export interface AgentApiOptions {
   baseUrl?: string;
+  providerSettings?: () => ProviderSettings;
 }
 
 function normalizeBaseUrl(baseUrl?: string) {
@@ -66,20 +68,34 @@ async function requestAgentApi<T>(baseUrl: string, path: string, init: RequestIn
   return (await response.json()) as T;
 }
 
-export function createAgentApi({ baseUrl }: AgentApiOptions = {}) {
+export function createAgentApi({ baseUrl, providerSettings }: AgentApiOptions = {}) {
   const resolvedBaseUrl = normalizeBaseUrl(baseUrl);
+  const getProviderSettings = providerSettings ?? loadProviderSettings;
 
-  async function requestJson<T>(path: string, method: string, body?: unknown) {
+  function providerHeaders(): Record<string, string> {
+    const settings = getProviderSettings();
+    if (!settings.apiKey.trim()) return {};
+    if (!isTrustedLocalServiceUrl(resolvedBaseUrl)) {
+      throw new AgentApiError("为避免密钥外泄，模型配置只能发送到本机、局域网或 Tailscale 私有服务。");
+    }
+    return {
+      "X-API-Key": settings.apiKey,
+      "X-API-Base-URL": settings.baseUrl,
+      "X-Model": settings.model,
+    };
+  }
+
+  async function requestJson<T>(path: string, method: string, body?: unknown, includeProvider = false) {
     return requestAgentApi<T>(resolvedBaseUrl, path, {
       method,
       headers: {
         Accept: "application/json",
         ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+        ...(includeProvider ? providerHeaders() : {}),
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
   }
-
   return {
     async getHealth() {
       return requestJson<AgentHealth>("/api/health", "GET");
@@ -114,10 +130,10 @@ export function createAgentApi({ baseUrl }: AgentApiOptions = {}) {
       });
     },
     async analyze(request: AnalysisRequest) {
-      return requestJson<Analysis>("/api/analyze", "POST", request);
+      return requestJson<Analysis>("/api/analyze", "POST", request, true);
     },
     async analyzeBatch(request: BatchAnalysisRequest) {
-      return requestJson<BatchAnalysisResponse>("/api/batch", "POST", request);
+      return requestJson<BatchAnalysisResponse>("/api/batch", "POST", request, true);
     },
     async exportBatchCsv(request: BatchAnalysisRequest) {
       let response: Response;
@@ -127,6 +143,7 @@ export function createAgentApi({ baseUrl }: AgentApiOptions = {}) {
           headers: {
             Accept: "text/csv",
             "Content-Type": "application/json",
+            ...providerHeaders(),
           },
           body: JSON.stringify(request),
         });
@@ -151,7 +168,7 @@ export function createAgentApi({ baseUrl }: AgentApiOptions = {}) {
       return requestJson<SkillDefinition[]>("/api/skills", "GET");
     },
     async runSkill(skillId: string, request: SkillRunRequest) {
-      return requestJson<SkillRunResult>(`/api/skills/${encodeURIComponent(skillId)}/run`, "POST", request);
+      return requestJson<SkillRunResult>(`/api/skills/${encodeURIComponent(skillId)}/run`, "POST", request, true);
     },
     async listSkillRuns(analysisId: string) {
       return requestJson<SkillRunResult[]>(

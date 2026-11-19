@@ -39,6 +39,42 @@ describe("agent API client", () => {
     );
   });
 
+  it("sends browser-local provider settings only on model-backed requests", async () => {
+    const fetchMock = mockFetch(Response.json(health));
+    fetchMock.mockResolvedValueOnce(Response.json(health));
+    fetchMock.mockResolvedValueOnce(Response.json({}));
+    const api = createAgentApi({
+      baseUrl: "http://127.0.0.1:9000",
+      providerSettings: () => ({
+        baseUrl: "https://open.bigmodel.cn/api/paas/v4",
+        apiKey: "local-secret",
+        model: "glm-test",
+      }),
+    });
+
+    await api.getHealth();
+    await api.analyze({ resume_text: "resume", jd_text: "jd", company: "company", title: "title" });
+
+    const healthHeaders = (fetchMock.mock.calls[0][1] as RequestInit).headers as Record<string, string>;
+    const analysisHeaders = (fetchMock.mock.calls[1][1] as RequestInit).headers as Record<string, string>;
+    expect(healthHeaders).not.toHaveProperty("X-API-Key");
+    expect(analysisHeaders).toMatchObject({
+      "X-API-Key": "local-secret",
+      "X-API-Base-URL": "https://open.bigmodel.cn/api/paas/v4",
+      "X-Model": "glm-test",
+    });
+  });
+  it("refuses to send provider credentials to a public backend URL", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const api = createAgentApi({
+      baseUrl: "https://collector.example.com",
+      providerSettings: () => ({ baseUrl: "https://api.example.com/v1", apiKey: "secret", model: "model" }),
+    });
+    await expect(api.analyze({ resume_text: "r", jd_text: "j", company: "c", title: "t" }))
+      .rejects.toThrow(/密钥外泄/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
   it("uses same-origin /api paths by default", async () => {
     const fetchMock = mockFetch(Response.json(health));
 
@@ -51,7 +87,7 @@ describe("agent API client", () => {
       status: 413,
       headers: { "Content-Type": "application/json" },
     }));
-    const api = createAgentApi({ baseUrl: "http://localhost:8000" });
+    const api = createAgentApi({ baseUrl: "http://localhost:18001" });
 
     const error = await api.getHealth().catch((currentError: unknown) => currentError);
     expect(error).toBeInstanceOf(AgentApiError);
@@ -60,7 +96,7 @@ describe("agent API client", () => {
 
   it("uploads resume files as multipart data without a JSON content type", async () => {
     const fetchMock = mockFetch(Response.json({ text: "Python developer", filename: "resume.pdf" }));
-    const api = createAgentApi({ baseUrl: "http://localhost:8000" });
+    const api = createAgentApi({ baseUrl: "http://localhost:18001" });
     const file = new File(["resume"], "resume.pdf", { type: "application/pdf" });
 
     await api.parseResume(file);
@@ -110,7 +146,7 @@ describe("business skill API client", () => {
     fetchMock.mockResolvedValueOnce(Response.json(skillRun));
     fetchMock.mockResolvedValueOnce(Response.json([skillRun]));
     fetchMock.mockResolvedValueOnce(Response.json(skillRun));
-    const api = createAgentApi({ baseUrl: "http://localhost:8000" });
+    const api = createAgentApi({ baseUrl: "http://localhost:18001" });
 
     await api.listSkills();
     await api.runSkill("resume-tailor", { analysis_id: "analysis-1" });
@@ -118,10 +154,10 @@ describe("business skill API client", () => {
     await api.getSkillRun("run-1");
 
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
-      "http://localhost:8000/api/skills",
-      "http://localhost:8000/api/skills/resume-tailor/run",
-      "http://localhost:8000/api/skill-runs?analysis_id=analysis-1",
-      "http://localhost:8000/api/skill-runs/run-1",
+      "http://localhost:18001/api/skills",
+      "http://localhost:18001/api/skills/resume-tailor/run",
+      "http://localhost:18001/api/skill-runs?analysis_id=analysis-1",
+      "http://localhost:18001/api/skill-runs/run-1",
     ]);
     expect(fetchMock.mock.calls[1][1]).toMatchObject({
       method: "POST",

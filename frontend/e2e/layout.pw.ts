@@ -2,8 +2,21 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 
 const ALL_TEMPLATE_IDS = ['graduate', 'graduate-research', 'internship', 'internship-project', 'experienced', 'experienced-specialist', 'technical', 'technical-timeline', 'sidebar', 'operations-impact', 'editorial', 'design-portfolio', 'management', 'consulting', 'academic', 'academic-compact'];
 
+test.beforeEach(async ({ page }) => {
+  await page.route('**/api/workspace', async (route) => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({ status: 404, json: { detail: 'workspace not found' } });
+      return;
+    }
+    const body = route.request().postDataJSON() as { state: unknown };
+    await route.fulfill({
+      json: { state: body.state, updated_at: new Date().toISOString(), revision: 1 },
+    });
+  });
+});
 async function openBuilder(page: Page) {
   await page.goto('/');
+  await expect(page.locator('.workspace-loading')).toBeHidden({ timeout: 10_000 });
   const menu = page.getByRole('button', { name: '展开导航', exact: true });
   if (await menu.isVisible()) await menu.click();
   await page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '简历版本', exact: true }).click();
@@ -41,6 +54,108 @@ for (const width of [1440, 1280, 1024, 768, 390, 320]) {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   });
 }
+
+test('workspace hydration blocks editing until the server snapshot resolves', async ({ page }) => {
+  await page.unroute('**/api/workspace');
+  await page.route('**/api/workspace', async (route) => {
+    if (route.request().method() === 'GET') {
+      await new Promise((resolve) => setTimeout(resolve, 450));
+      await route.fulfill({ status: 404, json: { detail: 'workspace not found' } });
+      return;
+    }
+    const body = route.request().postDataJSON() as { state: unknown };
+    await route.fulfill({ json: { state: body.state, updated_at: new Date().toISOString(), revision: 1 } });
+  });
+  await page.goto('/');
+  await expect(page.getByText('正在恢复你的求职工作区', { exact: true })).toBeVisible();
+  await expect(page.locator('.workspace-loading')).toBeHidden({ timeout: 10_000 });
+  await expect(page.getByRole('navigation', { name: '主导航' })).toBeVisible();
+});
+test('dirty local workspace is preserved when another device has a newer revision', async ({ page }) => {
+  await page.unroute('**/api/workspace');
+  const profile = {
+    name: '设备 B 的离线修改',
+    email: 'b@example.com',
+    phone: '',
+    location: '杭州',
+    targetRole: 'Python Agent 工程师',
+    headline: '',
+    education: '',
+    skills: '',
+    projects: '',
+    experience: '',
+    awards: '',
+  };
+  const remoteProfile = { ...profile, name: '设备 A 的服务器版本' };
+  await page.addInitScript(({ localProfile }) => {
+    localStorage.setItem('jobfit-ai-web-mvp', JSON.stringify({
+      version: 1,
+      profile: localProfile,
+      resumes: [],
+      applications: [],
+    }));
+    localStorage.setItem('jobfit-workspace-sync-v1', JSON.stringify({ dirty: true, revision: 1 }));
+  }, { localProfile: profile });
+  await page.route('**/api/workspace', async (route) => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({
+        json: {
+          state: { version: 1, profile: remoteProfile, resumes: [], applications: [] },
+          updated_at: '2026-11-19T00:00:00.000Z',
+          revision: 2,
+        },
+      });
+      return;
+    }
+    await route.fulfill({ status: 409, json: { detail: 'conflict', current: null } });
+  });
+
+  await page.goto('/');
+  await expect(page.locator('.workspace-loading')).toBeHidden({ timeout: 10_000 });
+  await expect(page.locator('.header-person strong')).toHaveText('设备 B 的离线修改');
+  await page.getByText('数据设置', { exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('发现另一台设备的更新');
+  await expect(page.getByRole('alert')).toContainText('当前浏览器中的修改没有丢失');
+});
+
+test('local edits become dirty before the debounce and survive an immediate reload', async ({ page }) => {
+  await page.unroute('**/api/workspace');
+  const remoteProfile = {
+    name: '服务器初始版本',
+    email: 'server@example.com',
+    phone: '',
+    location: '上海',
+    targetRole: 'Python 工程师',
+    headline: '',
+    education: '',
+    skills: '',
+    projects: '',
+    experience: '',
+    awards: '',
+  };
+  const remoteState = { version: 1, profile: remoteProfile, resumes: [], applications: [] };
+  await page.route('**/api/workspace', async (route) => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({ json: { state: remoteState, updated_at: '2026-11-19T00:00:00.000Z', revision: 1 } });
+      return;
+    }
+    const body = route.request().postDataJSON() as { state: typeof remoteState };
+    await route.fulfill({ json: { state: body.state, updated_at: new Date().toISOString(), revision: 2 } });
+  });
+
+  await page.goto('/');
+  await expect(page.locator('.workspace-loading')).toBeHidden({ timeout: 10_000 });
+  await page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '经历库', exact: true }).click();
+  await page.getByLabel('姓名', { exact: true }).fill('本地即时修改');
+  await expect.poll(() => page.evaluate(() => {
+    const value = localStorage.getItem('jobfit-workspace-sync-v1');
+    return value ? JSON.parse(value).dirty : false;
+  })).toBe(true);
+
+  await page.reload();
+  await expect(page.locator('.workspace-loading')).toBeHidden({ timeout: 10_000 });
+  await expect(page.locator('.header-person strong')).toHaveText('本地即时修改');
+});
 
 test('top navigation and editor/preview tabs remain operable', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -127,6 +242,47 @@ test('appearance controls update preview, persist, and keep resume content', asy
   await expect(paper).toHaveAttribute('data-page-count', '2');
   await expect(paper).toContainText('排版保留测试');
 });
+test('BOSS integration center exposes guide, jobs, and local API settings', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto('/');
+  await page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: 'BOSS 接入', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '你把时间留给选择，重复粘贴交给系统。' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: /接入教程/ })).toHaveAttribute('aria-selected', 'true');
+  await page.getByRole('tab', { name: 'API 配置', exact: true }).click();
+  await expect(page.getByLabel('请求地址', { exact: true })).toHaveValue('https://open.bigmodel.cn/api/paas/v4');
+  await expect(page.getByPlaceholder('仅保存在当前浏览器')).toHaveAttribute('type', 'password');
+  await page.getByLabel('请求地址', { exact: true }).fill('https://api.example.com/v1');
+  await page.getByPlaceholder('仅保存在当前浏览器').fill('local-only-key');
+  await page.getByRole('button', { name: '保存到当前浏览器', exact: true }).click();
+  await page.reload();
+  await page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: 'BOSS 接入', exact: true }).click();
+  await page.getByRole('tab', { name: 'API 配置', exact: true }).click();
+  await expect(page.getByLabel('请求地址', { exact: true })).toHaveValue('https://api.example.com/v1');
+  expect(await page.getByPlaceholder('仅保存在当前浏览器').inputValue()).toBe('local-only-key');
+});
+test('a BOSS job can be handed off to the JD matching workspace', async ({ page }) => {
+  const job = {
+    id: 'boss-job-1', source: 'boss', source_job_id: 'boss-1',
+    source_url: 'https://www.zhipin.com/job_detail/boss-1.html', company: '星河科技',
+    title: 'Python Agent 工程师', location: '上海', salary: '25-40K', experience: '3-5年',
+    education: '本科', description: '负责 Python Agent、RAG 和 FastAPI 服务开发。',
+    recruiter_name: '招聘同学', recruiter_title: '技术招聘', tags: ['Python', 'Agent'],
+    fetched_at: '2026-11-18T10:00:00Z', created_at: '2026-11-18T10:00:00Z', updated_at: '2026-11-18T10:00:00Z',
+  };
+  await page.route('**/api/boss/health', (route) => route.fulfill({ json: { status: 'ok', source: 'boss', count: 1 } }));
+  await page.route('**/api/boss/jobs**', (route) => route.fulfill({ json: [job], headers: { 'X-Total-Count': '1' } }));
+  await page.goto('/');
+  await page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '简历版本', exact: true }).click();
+  await page.getByRole('button', { name: /新建简历/ }).click();
+  await page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: 'BOSS 接入', exact: true }).click();
+  await page.getByRole('tab', { name: /职位池/ }).click();
+  await expect(page.getByLabel(/本地匹配分 \d+/)).toBeVisible();
+  await page.getByRole('button', { name: '用这份 JD 匹配', exact: true }).click();
+  await expect(page.locator('#primary-navigation button[aria-current="page"]')).toHaveText('JD 匹配（本地规则）');
+  await expect(page.getByLabel('公司名', { exact: true })).toHaveValue('星河科技');
+  await expect(page.getByLabel('岗位名', { exact: true })).toHaveValue('Python Agent 工程师');
+  await expect(page.getByRole('textbox', { name: /岗位 JD/ })).toHaveValue(/RAG/);
+});
 test('sidebar preview keeps identity and content together on a full sheet', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await openBuilder(page);
@@ -164,7 +320,8 @@ for (const width of [1440, 390, 320]) {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await page.goto('/');
-    for (const name of ['工作台', '岗位分析与准备', '经历库', '简历版本', '模板与提纲', 'JD 匹配（本地规则）', '投递管理']) {
+    await expect(page.locator('.workspace-loading')).toBeHidden({ timeout: 10_000 });
+    for (const name of ['工作台', 'BOSS 接入', '岗位分析与准备', '经历库', '简历版本', '模板与提纲', 'JD 匹配（本地规则）', '投递管理']) {
       const toggle = page.getByRole('button', { name: '展开导航', exact: true });
       if (await toggle.isVisible()) await toggle.click();
       const target = page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name, exact: true });

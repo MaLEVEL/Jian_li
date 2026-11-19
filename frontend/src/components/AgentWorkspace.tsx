@@ -475,7 +475,7 @@ export function AgentWorkspace({
               <RefreshCcw size={17} />
               刷新健康状态
             </button>
-            <span>设置只读；模型和密钥由后端 .env 管理，前端不提供密钥输入。</span>
+            <span>模型与密钥请在“BOSS 接入 → API 配置”中填写；密钥只保存在当前浏览器，不进入后端 .env、SQLite 或备份。</span>
           </div>
           {healthError ? <StatusMessage text={healthError} type="error" /> : null}
         </div>

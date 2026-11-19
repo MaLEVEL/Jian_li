@@ -1,0 +1,210 @@
+:root {
+  color-scheme: light;
+  --ink: #163b50;
+  --muted: #5f7685;
+  --paper: #f3f9fc;
+  --card: #ffffff;
+  --line: #cfdee7;
+  --accent: #217ca3;
+  --accent-strong: #165b79;
+  --accent-soft: #e0f3fb;
+  --danger: #9c342d;
+  --danger-soft: #f8e5e1;
+  --warn: #8a6118;
+  font-family: "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  width: 380px;
+  margin: 0;
+  background:
+    radial-gradient(circle at 92% 2%, rgba(33, 124, 163, 0.15), transparent 32%),
+    var(--paper);
+  color: var(--ink);
+}
+
+button, input { font: inherit; }
+button { cursor: pointer; }
+
+.panel { padding: 20px; }
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.brand-mark {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 13px 4px 13px 4px;
+  background: var(--accent);
+  color: #ffffff;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  box-shadow: 0 8px 18px rgba(33, 124, 163, 0.24);
+}
+
+.eyebrow {
+  margin: 0 0 2px;
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+
+h1 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.service-card, .collect-card {
+  margin-bottom: 12px;
+  padding: 15px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 8px 24px rgba(40, 47, 42, 0.055);
+}
+
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+h2 {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.badge, .scope-label {
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.badge-idle { background: #e7f0f5; color: var(--muted); }
+.badge-ok { background: var(--accent-soft); color: var(--accent-strong); }
+.badge-error { background: var(--danger-soft); color: var(--danger); }
+.scope-label { background: #fff3d9; color: var(--warn); }
+
+label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+input {
+  width: 100%;
+  height: 44px;
+  padding: 0 11px;
+  border: 1px solid #bad1de;
+  border-radius: 9px;
+  outline: none;
+  background: #fff;
+  color: var(--ink);
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 12px;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(33, 124, 163, 0.16);
+}
+
+.button {
+  width: 100%;
+  min-height: 44px;
+  border-radius: 10px;
+  font-weight: 750;
+  transition: transform 120ms ease, background 150ms ease, opacity 150ms ease;
+}
+
+.button:hover:not(:disabled) { transform: translateY(-1px); }
+.button:active:not(:disabled) { transform: translateY(0); }
+.button:disabled { cursor: wait; opacity: 0.55; }
+
+.button-secondary {
+  margin-top: 9px;
+  border: 1px solid #b9d7e5;
+  background: #edf8fc;
+  color: var(--accent-strong);
+}
+
+.button-primary {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: white;
+  box-shadow: 0 7px 16px rgba(33, 124, 163, 0.22);
+}
+
+.button-primary:hover:not(:disabled) { background: var(--accent-strong); }
+
+.hint {
+  margin: -2px 0 12px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.counts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.count-item {
+  padding: 10px 11px;
+  border-radius: 10px;
+  background: #edf7fb;
+}
+
+.count-item span {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.count-item strong {
+  font-size: 22px;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.status {
+  min-height: 18px;
+  margin: 10px 2px 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.status.success { color: var(--accent-strong); }
+.status.error { color: var(--danger); }
+.status.warning { color: var(--warn); }
+
+.privacy-note {
+  margin: 8px 2px 0;
+  padding-top: 10px;
+  border-top: 1px solid rgba(108, 112, 105, 0.18);
+  color: #747a74;
+  font-size: 11px;
+  line-height: 1.5;
+}
