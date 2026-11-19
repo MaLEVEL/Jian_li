@@ -2,11 +2,13 @@ import asyncio
 import csv
 import io
 import logging
+import zipfile
 from contextlib import asynccontextmanager
 from pathlib import Path
 from time import perf_counter
 from urllib.parse import urlsplit
 from uuid import uuid4
+from xml.etree import ElementTree as ET
 
 import httpx
 from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
@@ -42,6 +44,39 @@ MAX_FILE_BYTES = 2 * 1024 * 1024
 def csv_safe(value) -> str:
     text = str(value)
     return "'" + text if text.lstrip().startswith(('=', '+', '-', '@')) else text
+
+
+MAX_DOCX_XML_BYTES = 4 * 1024 * 1024
+
+
+def extract_docx_text(content: bytes) -> str:
+    try:
+        with zipfile.ZipFile(io.BytesIO(content)) as archive:
+            member = archive.getinfo('word/document.xml')
+            if member.file_size > MAX_DOCX_XML_BYTES:
+                raise ValueError('Word XML is too large')
+            with archive.open(member) as document:
+                xml = document.read(MAX_DOCX_XML_BYTES + 1)
+            if len(xml) > MAX_DOCX_XML_BYTES:
+                raise ValueError('Word XML is too large')
+            root = ET.fromstring(xml)
+            paragraphs: list[str] = []
+            for paragraph in root.iter('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p'):
+                chunks: list[str] = []
+                for node in paragraph.iter():
+                    tag = node.tag.rsplit('}', 1)[-1]
+                    if tag == 't' and node.text:
+                        chunks.append(node.text)
+                    elif tag == 'tab':
+                        chunks.append('\t')
+                    elif tag in ('br', 'cr'):
+                        chunks.append('\n')
+                line = ''.join(chunks).strip()
+                if line:
+                    paragraphs.append(line)
+            return '\n'.join(paragraphs)
+    except (OSError, zipfile.BadZipFile, KeyError, ET.ParseError, ValueError) as error:
+        raise ValueError('Invalid DOCX') from error
 
 
 def normalized_request_host(value: str) -> str:
@@ -303,8 +338,8 @@ def create_app(
     async def parse_resume(file: UploadFile = File(...)):
         filename = Path(file.filename or '').name
         suffix = Path(filename).suffix.lower()
-        if suffix not in ('.txt', '.pdf'):
-            raise HTTPException(422, '只支持 UTF-8 TXT 或包含文字的 PDF')
+        if suffix not in ('.txt', '.pdf', '.docx'):
+            raise HTTPException(422, '只支持 UTF-8 TXT、包含文字的 PDF 或现代 Word (.docx)')
         content = await file.read(MAX_FILE_BYTES + 1)
         await file.close()
         if len(content) > MAX_FILE_BYTES:
@@ -317,12 +352,22 @@ def create_app(
                 if reader.is_encrypted or len(reader.pages) > 20:
                     raise ValueError('Encrypted or too many pages')
                 text = await asyncio.to_thread(lambda: '\n'.join(page.extract_text() or '' for page in reader.pages))
+            elif suffix == '.docx':
+                try:
+                    text = await asyncio.to_thread(extract_docx_text, content)
+                except ValueError:
+                    raise HTTPException(
+                        422,
+                        '无法读取 Word 文件：请使用未加密的现代 .docx，或另存为 .docx 后重新上传。',
+                    ) from None
             else:
                 text = content.decode('utf-8-sig')
             if any(ord(c) < 32 and c not in '\n\r\t' for c in text):
                 raise ValueError('Binary text')
+        except HTTPException:
+            raise
         except Exception:
-            raise HTTPException(422, '无法读取文件：请使用 UTF-8 TXT 或未加密、最多 20 页的文字 PDF；扫描件需要先 OCR。') from None
+            raise HTTPException(422, '无法读取文件：请使用 UTF-8 TXT、未加密且最多 20 页的文字 PDF，或现代 .docx；扫描件需要先 OCR。') from None
         if not text.strip() or len(text) > 30000:
             raise HTTPException(422, '未提取到文字，或文本超过 30000 字符；请改为粘贴简历正文。')
         return {'text': text.strip(), 'filename': filename}

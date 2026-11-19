@@ -102,8 +102,8 @@ export function createAgentApi({ baseUrl, providerSettings }: AgentApiOptions = 
     },
     async parseResume(file: File) {
       const extension = file.name.toLowerCase().split(".").pop();
-      if (!extension || !["pdf", "txt"].includes(extension)) {
-        throw new AgentApiError("仅支持上传 PDF 或 TXT 简历文件。");
+      if (!extension || !["pdf", "txt", "docx"].includes(extension)) {
+        throw new AgentApiError("仅支持上传 PDF、TXT 或现代 Word (.docx) 简历文件。");
       }
       if (file.size > 2 * 1024 * 1024) {
         throw new AgentApiError("简历文件不能超过 2MB。");

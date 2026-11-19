@@ -94,6 +94,21 @@ describe("agent API client", () => {
     expect(error).toMatchObject({ status: 413, message: "简历文件超过 2MB" });
   });
 
+  it("accepts modern docx resume uploads and rejects legacy doc files", async () => {
+    const fetchMock = mockFetch(Response.json({ text: "Python developer", filename: "resume.docx" }));
+    const api = createAgentApi();
+    const docx = new File(["zip"], "resume.docx", {
+      type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    });
+    await expect(api.parseResume(docx)).resolves.toMatchObject({ filename: "resume.docx" });
+    expect(fetchMock).toHaveBeenCalled();
+
+    const legacyDoc = new File(["legacy"], "resume.doc", { type: "application/msword" });
+    await expect(api.parseResume(legacyDoc)).rejects.toThrow(
+      "仅支持上传 PDF、TXT 或现代 Word (.docx) 简历文件。",
+    );
+  });
+
   it("uploads resume files as multipart data without a JSON content type", async () => {
     const fetchMock = mockFetch(Response.json({ text: "Python developer", filename: "resume.pdf" }));
     const api = createAgentApi({ baseUrl: "http://localhost:18001" });

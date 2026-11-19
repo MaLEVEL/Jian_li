@@ -519,8 +519,8 @@ export function AgentWorkspace({
                   <div className="agent-upload">
                     <label className="ghost-button file-button">
                       <FileUp size={17} />
-                      {resumeUploading ? "解析中…" : "选择 PDF/TXT"}
-                      <input type="file" accept=".pdf,.txt,application/pdf,text/plain" onChange={handleResumeUpload} disabled={resumeUploading} />
+                      {resumeUploading ? "解析中…" : "选择 PDF/TXT/DOCX"}
+                      <input type="file" accept=".pdf,.txt,.docx,application/pdf,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={handleResumeUpload} disabled={resumeUploading} />
                     </label>
                     <small>{uploadedResume ? `已解析：${uploadedResume.filename} · ${uploadedResume.text.length} 个字符` : "文件会提交到本地 FastAPI 解析，大小不超过 2MB。"}</small>
                   </div>

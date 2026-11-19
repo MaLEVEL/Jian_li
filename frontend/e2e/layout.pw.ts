@@ -298,11 +298,11 @@ test('uploaded resumes enter the review and edit workflow', async ({ page }) => 
   await openBuilder(page);
   await page.locator('.version-manager > summary').click();
   await page.setInputFiles('.resume-upload-row input[type="file"]', {
-    name: 'uploaded-resume.txt',
-    mimeType: 'text/plain',
+    name: 'uploaded-resume.docx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     buffer: Buffer.from('uploaded resume', 'utf8'),
   });
-  await expect(page.getByText('已解析 uploaded-resume.txt，请核对后保存为简历版本。')).toBeVisible();
+  await expect(page.getByText('已解析 uploaded-resume.docx，请核对后保存为简历版本。')).toBeVisible();
   await expect(page.locator('textarea[placeholder="粘贴简历文本"]')).toHaveValue(/王上传/);
   await page.getByRole('button', { name: '识别并核对内容', exact: true }).click();
   await page.getByRole('button', { name: /保存为简历版本|确认保存|确认导入/ }).click();

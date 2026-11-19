@@ -372,7 +372,7 @@ export function BuilderView({
       onImportDraftChange(undefined);
       setResumeUploadNotice(`已解析 ${file.name}，请核对后保存为简历版本。`);
     } catch (error) {
-      setResumeUploadNotice(error instanceof Error ? error.message : "简历解析失败，请改用 TXT 或文字版 PDF。");
+      setResumeUploadNotice(error instanceof Error ? error.message : "简历解析失败，请改用 TXT、文字版 PDF 或现代 .docx。");
     } finally {
       setResumeUploading(false);
     }
@@ -466,10 +466,10 @@ export function BuilderView({
           <div className="resume-upload-row">
             <label className="secondary-button file-button">
               <Upload size={17} />
-              {resumeUploading ? "解析中…" : "上传 PDF / TXT"}
-              <input type="file" accept=".pdf,.txt,application/pdf,text/plain" onChange={handleResumeFileUpload} disabled={resumeUploading} />
+              {resumeUploading ? "解析中…" : "上传 PDF / TXT / DOCX"}
+              <input type="file" accept=".pdf,.txt,.docx,application/pdf,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={handleResumeFileUpload} disabled={resumeUploading} />
             </label>
-            <small>{resumeUploadNotice || "上传后会提取文字并进入下面的核对流程；之后可编辑、优化、匹配和导出。"}</small>
+            <small>{resumeUploadNotice || "支持 PDF、TXT 和现代 .docx；上传后会提取文字并进入下面的核对流程，之后可编辑、优化、匹配和导出。"}</small>
           </div>
           <label><span>已有简历文本</span>
           <textarea
