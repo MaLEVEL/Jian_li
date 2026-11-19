@@ -243,7 +243,7 @@ h1, h2, h3 { text-wrap: balance; }
 .job-framework h4 { color: #315e7a; font-size: 13px; font-weight: 650; margin: 0 0 10px; }
 .job-framework ul { margin: 0; padding-left: 18px; color: #4b6679; font-size: 13px; line-height: 1.8; }
 .job-framework li + li { margin-top: 8px; }
-.skip-link { position: absolute; z-index: 20; left: 16px; top: -70px; background: white; color: #07547e; padding: 10px 16px; border: 2px solid #0874ad; }
+.skip-link { position: absolute; z-index: 100; left: 16px; top: -70px; background: white; color: #07547e; padding: 10px 16px; border: 2px solid #0874ad; }
 .skip-link:focus { top: 8px; }
 @media (max-width: 1150px) { .template-library__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .job-framework details > div { grid-template-columns: 1fr; gap: 22px; } }
 @media (max-width: 760px) { .hero-horizon { width: 150%; height: 55%; } .template-library__grid { gap: 16px; } .template-card__preview { margin: 13px 12px 0; padding: 14px 10px; gap: 7px; min-height: 215px; } .template-card__body { padding: 14px 12px; } .template-card__body > strong { font-size: 14px; } .template-card__body > small { font-size: 12px; min-height: 62px; } .job-framework { padding: 21px; } .job-framework > header { flex-direction: column; } .template-library { gap: 35px; } .job-framework-picker { gap: 8px; } .job-framework-picker__option { padding: 10px 13px; } input, textarea, select { font-size: 16px !important; }

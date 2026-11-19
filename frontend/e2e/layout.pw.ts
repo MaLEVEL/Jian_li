@@ -157,6 +157,65 @@ test('local edits become dirty before the debounce and survive an immediate relo
   await expect(page.locator('.header-person strong')).toHaveText('本地即时修改');
 });
 
+test('the top header stays pinned while scrolling', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openBuilder(page);
+  await page.getByRole('tab', { name: '预览', exact: true }).click();
+  await expect(page.locator('.resume-paper')).toBeVisible();
+
+  const header = page.locator('.site-header');
+  const before = await page.evaluate(() => window.scrollY);
+  await page.mouse.wheel(0, 1_200);
+  await page.waitForFunction((previous) => window.scrollY > previous, before);
+  await expect(header).toBeVisible();
+
+  const box = await header.boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.y).toBeLessThanOrEqual(0);
+  expect(box!.x).toBeLessThanOrEqual(0);
+  expect(box!.width).toBe(1440);
+
+  const navigation = await page.getByRole('navigation', { name: '主导航' }).boundingBox();
+  expect(navigation).not.toBeNull();
+  expect(navigation!.y).toBeGreaterThanOrEqual(0);
+  expect(navigation!.y + navigation!.height).toBeLessThanOrEqual(box!.y + box!.height + 1);
+});
+
+test('skip link remains above the pinned header and is clickable', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  await expect(page.locator('.workspace-loading')).toBeHidden({ timeout: 10_000 });
+
+  const skipLink = page.getByRole('link', { name: '跳到主要内容' });
+  await skipLink.focus();
+  await expect(skipLink).toBeVisible();
+
+  const box = await skipLink.boundingBox();
+  expect(box).not.toBeNull();
+  const hit = await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.getAttribute('class'), [
+    box!.x + box!.width / 2,
+    box!.y + box!.height / 2,
+  ]);
+  expect(hit).toContain('skip-link');
+});
+
+test('skip link target clears the expanded mobile navigation', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 700 });
+  await page.goto('/');
+  await expect(page.locator('.workspace-loading')).toBeHidden({ timeout: 10_000 });
+  await page.getByRole('button', { name: '展开导航', exact: true }).click();
+
+  await page.getByRole('link', { name: '跳到主要内容' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#main-content')).toBeFocused();
+
+  const header = await page.locator('.site-header').boundingBox();
+  const main = await page.locator('#main-content').boundingBox();
+  expect(header).not.toBeNull();
+  expect(main).not.toBeNull();
+  expect(main!.y).toBeGreaterThanOrEqual(header!.y + header!.height - 1);
+});
+
 test('top navigation and editor/preview tabs remain operable', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await openBuilder(page);

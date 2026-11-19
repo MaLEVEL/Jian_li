@@ -101,6 +101,7 @@ export default function App() {
   const skipWorkspaceSave = useRef(true);
   const workspaceSyncBlocked = useRef(false);
   const workspaceSaveChain = useRef<Promise<boolean>>(Promise.resolve(false));
+  const siteHeaderRef = useRef<HTMLElement | null>(null);
   const suppressNextWorkspaceSave = useRef(false);
   const [workspaceSync, setWorkspaceSync] = useState<"connecting" | "saved" | "error">("connecting");
   const [workspaceReady, setWorkspaceReady] = useState(false);
@@ -287,6 +288,22 @@ export default function App() {
     }, message.type === "error" ? 6000 : 4200);
     return () => window.clearTimeout(timer);
   }, [message]);
+
+  useEffect(() => {
+    if (!workspaceReady) return;
+    const updateHeaderOffset = () => {
+      const height = siteHeaderRef.current?.offsetHeight ?? 158;
+      document.documentElement.style.setProperty('--site-header-offset', `${height}px`);
+    };
+    updateHeaderOffset();
+    const observer = new ResizeObserver(updateHeaderOffset);
+    if (siteHeaderRef.current) observer.observe(siteHeaderRef.current);
+    window.addEventListener('resize', updateHeaderOffset);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', updateHeaderOffset);
+    };
+  }, [workspaceReady, navExpanded]);
 
   useEffect(() => {
     if (!resumes.length) {
@@ -1101,7 +1118,7 @@ export default function App() {
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main-content">跳到主要内容</a>
-      <header className="site-header">
+      <header ref={siteHeaderRef} className="site-header">
         <div className="site-header__identity">
         <div className="brand-lockup">
           <div className="brand-mark">帆</div>
