@@ -1,8 +1,8 @@
-# JobFit · 求职作品室 / JD–Resume Agent
+# 职启云帆 · 求职成长工作台 / JD–Resume Agent
 
-面向 Python / Agent 求职的全栈作品：React 天蓝色求职作品室 + FastAPI / LangGraph 分析服务，覆盖真实经历整理、简历制作、岗位拆解、面试准备和投递跟进。
+面向 Python / Agent 求职的全栈作品：React 天蓝色求职成长工作台 + FastAPI / LangGraph 分析服务，覆盖真实经历整理、简历制作、岗位拆解、面试准备和投递跟进。
 
-![JobFit 天蓝色求职作品室与顶部导航](docs/assets/sky-workspace-1440.png)
+![职启云帆：天蓝色求职成长工作台与顶部导航](docs/assets/sky-workspace-1440.png)
 
 ## 功能
 
@@ -89,13 +89,13 @@ https://open.bigmodel.cn/api/paas/v4/
 
 模型名需使用你的账户可用型号，示例不承诺长期免费或可用。官方说明：https://docs.bigmodel.cn/cn/guide/develop/openai/introduction 。API Key 只保存在当前浏览器 localStorage；分析请求时临时放入发往本机后端的请求头，不写入 SQLite、JSON 备份、容器环境变量、日志或 Git。
 
-根目录 `.env` 只保留端口、数据目录、检索模式和局域网绑定等部署参数，不需要也不会读取 `JOBFIT_API_KEY`。浏览器未配置完整的三项模型设置时，系统明确使用离线规则模式。上游超时、限流、无效 JSON 有限重试，401 不重试；失败呈现 degraded 与具体警告，不伪造成功。
+根目录 `.env` 只保留端口、数据目录、检索模式和局域网绑定等部署参数，不需要也不会读取 `YUNFAN_API_KEY`。浏览器未配置完整的三项模型设置时，系统明确使用离线规则模式。上游超时、限流、无效 JSON 有限重试，401 不重试；失败呈现 degraded 与具体警告，不伪造成功。
 
 ## 可选 BGE 检索
 
 ```powershell
 .venv\Scripts\python.exe -m pip install -r backend/requirements-rag.txt
-# .env 修改 JOBFIT_RAG_MODE=bge 后重启
+# .env 修改 YUNFAN_RAG_MODE=bge 后重启
 ```
 
 首次检索下载 BAAI/bge-small-zh-v1.5 和 BAAI/bge-reranker-base，需要额外网络、磁盘和内存。默认 Docker 使用 local 模式。依赖/模型不可用会给检索警告，不把稀疏向量声称为 BGE。
@@ -108,7 +108,7 @@ docker compose logs -f
 docker compose down
 ```
 
-页面仍为 http://127.0.0.1:18001 。命名卷 jobfit-data 保存素材和报告；down 保留数据，down -v 删除数据。端口默认只绑定本机。若 18001 被占用，可在 .env 设置其他 `JOBFIT_PORT`。可信局域网跨设备时同时设置 `JOBFIT_BIND_HOST=0.0.0.0` 与 `JOBFIT_ALLOWED_HOSTS=主机局域网IP或私有DNS名`，并且只通过该明确地址访问。Host 白名单禁止 `*`，不要直接暴露公网。脚本启动也可用 `scripts/start.ps1 -Port 18001`。
+页面仍为 http://127.0.0.1:18001 。Docker 命名卷保存素材和报告；down 保留数据，down -v 删除数据。端口默认只绑定本机。若 18001 被占用，可在 .env 设置其他 `YUNFAN_PORT`。可信局域网跨设备时同时设置 `YUNFAN_BIND_HOST=0.0.0.0` 与 `YUNFAN_ALLOWED_HOSTS=主机局域网IP或私有DNS名`，并且只通过该明确地址访问。Host 白名单禁止 `*`，不要直接暴露公网。脚本启动也可用 `scripts/start.ps1 -Port 18001`。
 
 ## API
 

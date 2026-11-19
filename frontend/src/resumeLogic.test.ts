@@ -22,7 +22,7 @@ const baseResume: ResumeVersion = {
     summary: "React and TypeScript frontend developer",
     skills: ["Python", "React", "TypeScript", "Vite"],
     education: ["Software Engineering"],
-    projects: ["Campus marketplace with search filters", "JobFit dashboard built with React and Vite"],
+    projects: ["Campus marketplace with search filters", "职启云帆 dashboard built with React and Vite"],
     experience: ["Frontend intern building reusable components"],
     awards: [],
   },
@@ -85,7 +85,7 @@ describe("resume logic", () => {
 
   it("optimizes resume sections with JD-focused ordering and highlight", () => {
     const job = {
-      company: "JobFit Labs",
+      company: "云帆科技",
       title: "Frontend Engineer",
       description: "React TypeScript Vite components user experience",
     };
@@ -94,7 +94,7 @@ describe("resume logic", () => {
 
     expect(optimized.summary).toContain("Frontend Engineer");
     expect(optimized.projects[0]).toContain("岗位相关亮点");
-    expect(optimized.projects[1]).toContain("JobFit dashboard");
+    expect(optimized.projects[1]).toContain("职启云帆 dashboard");
     expect(optimized.projects[1]).toContain("匹配关键词");
     expect(optimized.skills.slice(0, 3)).toEqual(expect.arrayContaining(["React", "TypeScript", "Vite"]));
   });
@@ -155,13 +155,13 @@ Email: jane@example.com
 Skills: React, TypeScript, Vite, CSS
 Education: Software Engineering Bachelor at Example University
 Experience: Frontend Engineer Intern built reusable form components
-Project: JobFit platform for resume matching and application tracking
+Project: 职启云帆 platform for resume matching and application tracking
 Award: Campus software competition finalist`);
 
     expect(sections.skills).toEqual(expect.arrayContaining(["React", "TypeScript", "Vite"]));
     expect(sections.education.join(" ")).toMatch(/University/i);
     expect(sections.experience.join(" ")).toMatch(/Intern/i);
-    expect(sections.projects.join(" ")).toMatch(/JobFit platform/i);
+    expect(sections.projects.join(" ")).toMatch(/职启云帆 platform/i);
     expect(sections.awards.join(" ")).toMatch(/competition/i);
   });
 

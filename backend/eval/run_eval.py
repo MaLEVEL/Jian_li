@@ -92,7 +92,7 @@ def _write_json(path: Path, report: dict) -> None:
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Run the offline synthetic JobFit evaluation")
+    parser = argparse.ArgumentParser(description="Run the offline synthetic 职启云帆 evaluation")
     parser.add_argument(
         "--output",
         default="docs/evaluation-report.json",

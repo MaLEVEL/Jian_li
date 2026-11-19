@@ -79,23 +79,23 @@ async function ensureServerPermission(serverUrl) {
   // Call request directly from the click task. An async contains() check before
   // request() can consume the user gesture on stricter Chromium versions.
   const granted = await chrome.permissions.request({ origins: [pattern] });
-  if (!granted) throw new Error("需要允许扩展访问这个 JobFit 服务地址。");
+  if (!granted) throw new Error("需要允许扩展访问这个职启云帆服务地址。");
 }
 
 async function onTestHealth() {
   setBusy(testButton, true, "连接中…", "测试连接");
   setHealth("检测中", "idle");
-  setStatus("正在连接本机 JobFit 服务…");
+  setStatus("正在连接本机职启云帆服务…");
   try {
     const serverUrl = normalizeInput();
     serverInput.value = serverUrl;
     await ensureServerPermission(serverUrl);
     await chrome.storage.local.set({ [STORAGE_KEY]: serverUrl });
-    const result = await sendMessage({ type: "JOBFIT_TEST_HEALTH", serverUrl });
+    const result = await sendMessage({ type: "YUNFAN_TEST_HEALTH", serverUrl });
     if (!result.ok) throw new Error(result.error || "健康检查失败。");
     setHealth("已连接", "ok");
     const latency = Number.isFinite(result.latencyMs) ? `（${result.latencyMs} ms）` : "";
-    setStatus(`JobFit 服务连接正常${latency}`, "success");
+    setStatus(`职启云帆服务连接正常${latency}`, "success");
   } catch (error) {
     setHealth("连接失败", "error");
     setStatus(error.message || "健康检查失败。", "error");
@@ -115,7 +115,7 @@ async function onCollectJobs() {
     serverInput.value = serverUrl;
     await ensureServerPermission(serverUrl);
     await chrome.storage.local.set({ [STORAGE_KEY]: serverUrl });
-    const result = await sendMessage({ type: "JOBFIT_COLLECT_JOBS", serverUrl });
+    const result = await sendMessage({ type: "YUNFAN_COLLECT_JOBS", serverUrl });
     setResultCounts(result);
     if (!result.ok) {
       setStatus(result.error || "没有采集到可导入的职位。", "warning");

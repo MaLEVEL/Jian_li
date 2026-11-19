@@ -66,7 +66,7 @@ def create_app(
     async def lifespan(application):
         yield
 
-    application = FastAPI(title='JobFit AI Agent', version='1.0.0', lifespan=lifespan)
+    application = FastAPI(title='职启云帆 · 求职成长工作台 API', version='1.0.0', lifespan=lifespan)
     application.state.store = store
     application.state.settings = config
     application.state.provider_transport = provider_transport
@@ -88,7 +88,7 @@ def create_app(
         if hostname not in config.allowed_host_list:
             response = JSONResponse(
                 status_code=400,
-                content={'detail': '请求 Host 不在允许列表中。请配置 JOBFIT_ALLOWED_HOSTS。'},
+                content={'detail': '请求 Host 不在允许列表中。请配置 YUNFAN_ALLOWED_HOSTS。'},
             )
         else:
             origin = request.headers.get('origin')
@@ -261,7 +261,7 @@ def create_app(
             job = data.jobs[error['index']]
             writer.writerow([csv_safe(job.company), csv_safe(job.title), '', '', '', '', error['error']])
         return Response(content=('\ufeff' + buffer.getvalue()).encode('utf-8'),
-            media_type='text/csv; charset=utf-8', headers={'Content-Disposition': 'attachment; filename=jobfit-ranking.csv'})
+            media_type='text/csv; charset=utf-8', headers={'Content-Disposition': 'attachment; filename=zhiqi-yunfan-ranking.csv'})
 
     @application.get('/api/history')
     def history(limit: int = Query(default=100, ge=1, le=100)):

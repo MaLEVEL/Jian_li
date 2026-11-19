@@ -119,7 +119,7 @@ export default function App() {
   const [renameDraft, setRenameDraft] = useState("");
   const [message, setMessageState] = useState<AppMessage | undefined>({
     id: 0,
-    text: "欢迎回到求职作品室，你的简历与投递会同步保存在本机服务器。",
+    text: "欢迎回到求职成长工作台，你的简历与投递会同步保存在本机服务器。",
     type: "success",
   });
 
@@ -144,7 +144,7 @@ export default function App() {
         markWorkspaceDirty(workspaceRevision.current);
       }
     } catch (error) {
-      console.error("Failed to save local JobFit data", error);
+      console.error("Failed to save local 职启云帆 data", error);
       setMessage("本地保存失败：浏览器存储可能已满、被隐私模式限制，或简历文本过长。请先导出数据备份。", "error");
     }
   }, [applications, profile, resumes]);
@@ -983,7 +983,7 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `jobfit-ai-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    link.download = `zhiqi-yunfan-backup-${new Date().toISOString().slice(0, 10)}.json`;
     link.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     setMessage("已导出本地数据备份 JSON。换浏览器或换电脑时，可用它恢复经历库、简历版本和投递记录。");
@@ -1014,7 +1014,7 @@ export default function App() {
       navigateTo("workspace");
       setMessage("已导入数据备份，并完成结构校验。");
     } catch {
-      setMessage("导入失败：请选择有效的 JobFit AI JSON 备份文件。", "error");
+      setMessage("导入失败：请选择有效的职启云帆 JSON 备份文件。", "error");
     }
   }
 
@@ -1042,7 +1042,7 @@ export default function App() {
   }
 
   const pageCopy: Record<TabId, { title: string; description: string }> = {
-    workspace: { title: "让好经历，有个好开场。", description: "这里是你的求职作品室。把经历、简历和每一次机会慢慢整理好。" },
+    workspace: { title: "让好经历，有个好开场。", description: "这里是你的求职成长工作台。把经历、简历和每一次机会慢慢整理好。" },
     integration: { title: "把 BOSS 里的机会，带回自己的桌面。", description: "安装扩展、配置个人 API，再把当前页面可见的职位带入本机匹配和跟进流程。" },
     agent: { title: "把目标岗位，看得更清楚。", description: "从岗位要求到真实经历，找到值得表达的优势和下一步准备方向。" },
     profile: { title: "先把做过的事，写下来。", description: "课程项目、实习和个人作品，都是你自己的素材。" },
@@ -1089,7 +1089,7 @@ export default function App() {
     return (
       <div className="app-shell workspace-loading-shell">
         <main className="workspace-loading" role="status" aria-live="polite">
-          <div className="workspace-loading__mark">JF</div>
+          <div className="workspace-loading__mark">帆</div>
           <strong>正在恢复你的求职工作区</strong>
           <p>从本机服务器读取简历、职位和投递记录；如果服务器不可用，将自动使用浏览器缓存。</p>
           <span className="workspace-loading__bar" aria-hidden="true" />
@@ -1104,13 +1104,13 @@ export default function App() {
       <header className="site-header">
         <div className="site-header__identity">
         <div className="brand-lockup">
-          <div className="brand-mark">JF</div>
+          <div className="brand-mark">帆</div>
           <div>
-            <strong>JobFit</strong>
-            <span>求职作品室</span>
+            <strong>职启云帆</strong>
+            <span>求职成长工作台</span>
           </div>
         </div>
-        <div className="header-person"><span>{(profile.name || "我").slice(0, 1)}</span><div><strong>{profile.name || "我的作品室"}</strong><small>{profile.targetRole || "下一站，正在准备"}</small></div></div>
+        <div className="header-person"><span>{(profile.name || "我").slice(0, 1)}</span><div><strong>{profile.name || "我的工作台"}</strong><small>{profile.targetRole || "下一站，正在准备"}</small></div></div>
         <button className="nav-toggle secondary-button" type="button" aria-label={navExpanded ? "收起导航" : "展开导航"} aria-expanded={navExpanded} aria-controls="primary-navigation" onClick={() => setNavExpanded((open) => !open)}>
           {navExpanded ? <X size={20} /> : <Menu size={20} />}<span>导航</span>
         </button>

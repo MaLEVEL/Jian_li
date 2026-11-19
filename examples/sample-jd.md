@@ -1,6 +1,6 @@
 # Backend Engineer JD
 
-Company: JobFit Labs
+Company: 云帆科技
 
 We are looking for a backend engineer with Python and FastAPI experience. The role requires building REST APIs, designing SQLite or PostgreSQL-backed data models, writing automated tests with pytest, and collaborating with frontend engineers using React and TypeScript.
 

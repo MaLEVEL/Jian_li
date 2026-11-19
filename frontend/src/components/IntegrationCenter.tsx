@@ -284,7 +284,7 @@ export function IntegrationCenter({
               <ol>
                 <li>打开 Chrome 或 Edge 的扩展管理页，并开启“开发者模式”。</li>
                 <li>选择“加载已解压的扩展程序”，指向项目根目录下的 <code>extension</code> 文件夹。</li>
-                <li>打开 BOSS 直聘搜索结果或职位详情，点击 JobFit BOSS Collector。</li>
+                <li>打开 BOSS 直聘搜索结果或职位详情，点击“职启云帆 BOSS 职位采集器”。</li>
                 <li>确认服务地址为 <code>http://127.0.0.1:18001</code>，先测试连接，再采集当前页。</li>
               </ol>
             </div>

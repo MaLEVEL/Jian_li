@@ -11,7 +11,7 @@ const sections = {
   summary: "React frontend developer",
   skills: ["React", "TypeScript"],
   education: ["Software Engineering"],
-  projects: ["JobFit AI web app"],
+  projects: ["职启云帆 web app"],
   experience: ["Frontend intern"],
   awards: [],
 };
@@ -43,7 +43,7 @@ describe("storage normalization", () => {
       applications: [
         {
           id: "app-1",
-          job: { company: "JobFit", title: "Frontend Engineer", description: "React TypeScript" },
+          job: { company: "职启云帆", title: "Frontend Engineer", description: "React TypeScript" },
           status: "applied",
           resumeId: "resume-1",
           resumeTitle: "Stale title",

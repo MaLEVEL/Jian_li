@@ -17,7 +17,7 @@ const sections = {
   summary: "Python 与 Agent 项目实践者",
   skills: ["Python", "FastAPI", "LangGraph"],
   education: ["某大学 软件工程 本科"],
-  projects: ["JobFit AI：实现简历解析与 JD 匹配"],
+  projects: ["职启云帆：实现简历解析与 JD 匹配"],
   experience: ["后端实习：参与接口开发与测试"],
   awards: ["校级课程设计奖"],
 };

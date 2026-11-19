@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "JobFit BOSS 职位采集器",
+  "name": "职启云帆 BOSS 职位采集器",
   "version": "1.0.0",
-  "description": "采集用户当前打开的 BOSS 直聘页面中已显示的职位，并导入本机 JobFit 服务。",
+  "description": "采集用户当前打开的 BOSS 直聘页面中已显示的职位，并导入本机职启云帆服务。",
   "permissions": [
     "storage",
     "scripting",

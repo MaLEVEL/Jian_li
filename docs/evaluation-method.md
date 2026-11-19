@@ -2,7 +2,7 @@
 
 ## Purpose and ownership
 
-This evaluation provides a reproducible regression check for the offline JobFit pipeline without changing production code. It exercises the exact functions used by the application:
+This evaluation provides a reproducible regression check for the offline 职启云帆 pipeline without changing production code. It exercises the exact functions used by the application:
 
 - `app.nodes.parsers.local_job`
 - `app.nodes.parsers.local_resume`

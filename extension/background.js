@@ -64,14 +64,14 @@ function pickNumber(body, keys) {
 }
 
 function serviceError(body, status) {
-  if (!body) return `JobFit 服务返回 HTTP ${status}，响应为空。`;
+  if (!body) return `职启云帆服务返回 HTTP ${status}，响应为空。`;
   if (Array.isArray(body.detail)) {
     return body.detail.map((item) => item.msg || JSON.stringify(item)).join("；");
   }
   const detail = body.detail || body.error || body.message;
   if (typeof detail === "string" && detail.trim()) return detail.trim();
   if (detail && typeof detail === "object") return JSON.stringify(detail);
-  return `JobFit 服务返回 HTTP ${status}。`;
+  return `职启云帆服务返回 HTTP ${status}。`;
 }
 
 async function requestJson(url, options) {
@@ -80,7 +80,7 @@ async function requestJson(url, options) {
     response = await fetch(url, options);
   } catch (error) {
     const reason = error && error.message ? error.message : String(error);
-    throw new Error(`无法连接 JobFit 服务（${reason}）。请确认服务已启动且地址正确。`);
+    throw new Error(`无法连接 职启云帆服务（${reason}）。请确认服务已启动且地址正确。`);
   }
   const body = await readResponse(response);
   if (!response.ok) {
@@ -98,7 +98,7 @@ async function testHealth(message) {
   });
   return {
     ok: true,
-    message: "JobFit 服务连接正常。",
+    message: "职启云帆服务连接正常。",
     latencyMs: Date.now() - started,
     service: body
   };
@@ -132,7 +132,7 @@ async function collectPage(tab) {
   });
   const results = await chrome.scripting.executeScript({
     target: { tabId: tab.id },
-    func: () => globalThis.JobFitBossCollector?.collect()
+    func: () => globalThis.ZhiqiYunfanBossCollector?.collect()
   });
   return results && results[0] ? results[0].result : null;
 }
@@ -177,9 +177,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (!message || typeof message.type !== "string") return false;
 
   let operation;
-  if (message.type === "JOBFIT_TEST_HEALTH") {
+  if (message.type === "YUNFAN_TEST_HEALTH") {
     operation = testHealth(message);
-  } else if (message.type === "JOBFIT_COLLECT_JOBS") {
+  } else if (message.type === "YUNFAN_COLLECT_JOBS") {
     operation = collectJobs(message);
   } else {
     return false;

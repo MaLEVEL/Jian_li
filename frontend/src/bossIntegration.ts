@@ -134,7 +134,7 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}
     return await fetch(input, { ...init, signal: controller.signal });
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
-      throw new Error("本机 JobFit 服务响应超时，请检查 Docker 状态。");
+      throw new Error("本机职启云帆服务响应超时，请检查 Docker 状态。");
     }
     throw error;
   } finally {
@@ -158,7 +158,7 @@ async function requestBossResponse(baseUrl: string, path: string, init: RequestI
       headers: { Accept: "application/json", ...(init.headers ?? {}) },
     });
   } catch {
-    throw new Error("无法连接本机 JobFit 服务，请确认 Docker 服务正在运行。");
+    throw new Error("无法连接本机职启云帆服务，请确认 Docker 服务正在运行。");
   }
   if (!response.ok) throw new Error(await readError(response, "BOSS 接入服务请求失败。"));
   return response;
@@ -223,7 +223,7 @@ export async function testProviderConnection(
       },
     }, PROVIDER_CONNECTION_TIMEOUT_MS);
   } catch {
-    throw new Error("浏览器无法连接本机 JobFit 服务，请确认 Docker 正在运行。");
+    throw new Error("浏览器无法连接本机职启云帆服务，请确认 Docker 正在运行。");
   }
   if (!response.ok) throw new Error(await readError(response, `API 测试失败（HTTP ${response.status}）。`));
   return await response.json() as { ok: boolean; model: string; mode: string; latency_ms: number };

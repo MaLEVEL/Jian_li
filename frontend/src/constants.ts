@@ -48,7 +48,7 @@ export const DEFAULT_PROFILE: CandidateProfile = {
   education: "某某大学｜软件工程｜本科｜2022.09 - 2026.06｜GPA 3.6/4.0",
   skills: "React, TypeScript, JavaScript, HTML, CSS, Vite, Python, FastAPI, SQLite, Git",
   projects:
-    "JobFit AI 求职助手：使用 React 和 TypeScript 实现简历生成、JD 匹配、投递管理的前端原型，支持本地存储和关键词匹配。\n校园二手交易平台：负责商品发布、搜索筛选、订单状态页面，使用组件化方式提升复用性。",
+    "职启云帆求职助手：使用 React 和 TypeScript 实现简历生成、JD 匹配、投递管理的前端原型，支持本地存储和关键词匹配。\n校园二手交易平台：负责商品发布、搜索筛选、订单状态页面，使用组件化方式提升复用性。",
   experience:
     "前端开发实习生｜某科技公司｜2025.07 - 2025.10｜参与后台管理系统页面开发，封装表单和表格组件，配合后端联调接口。",
   awards: "校级优秀课程设计｜英语四级｜GitHub 项目作品集",

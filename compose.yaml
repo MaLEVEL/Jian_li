@@ -2,18 +2,18 @@ services:
   jobfit:
     build: .
     ports:
-      - "${JOBFIT_BIND_HOST:-127.0.0.1}:${JOBFIT_PORT:-18001}:8000"
+      - "${YUNFAN_BIND_HOST:-127.0.0.1}:${YUNFAN_PORT:-18001}:8000"
     environment:
-      JOBFIT_BASE_URL: ${JOBFIT_BASE_URL:-https://open.bigmodel.cn/api/paas/v4/}
-      JOBFIT_MODEL: ${JOBFIT_MODEL:-glm-4-flash}
-      JOBFIT_LLM_MODE: ${JOBFIT_LLM_MODE:-auto}
-      JOBFIT_TIMEOUT_SECONDS: ${JOBFIT_TIMEOUT_SECONDS:-60}
-      JOBFIT_MAX_RETRIES: ${JOBFIT_MAX_RETRIES:-2}
-      JOBFIT_REASONING_EFFORT: ${JOBFIT_REASONING_EFFORT:-}
-      JOBFIT_RAG_MODE: local
-      JOBFIT_DATA_DIR: /app/data
-      JOBFIT_ALLOWED_HOSTS: ${JOBFIT_ALLOWED_HOSTS:-127.0.0.1,localhost,::1}
-      JOBFIT_CORS_ORIGINS: ${JOBFIT_CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,chrome-extension://jdacbgmhcbpkoccblehfahhoekjiiopl}
+      YUNFAN_BASE_URL: ${YUNFAN_BASE_URL:-https://open.bigmodel.cn/api/paas/v4/}
+      YUNFAN_MODEL: ${YUNFAN_MODEL:-glm-4-flash}
+      YUNFAN_LLM_MODE: ${YUNFAN_LLM_MODE:-auto}
+      YUNFAN_TIMEOUT_SECONDS: ${YUNFAN_TIMEOUT_SECONDS:-60}
+      YUNFAN_MAX_RETRIES: ${YUNFAN_MAX_RETRIES:-2}
+      YUNFAN_REASONING_EFFORT: ${YUNFAN_REASONING_EFFORT:-}
+      YUNFAN_RAG_MODE: local
+      YUNFAN_DATA_DIR: /app/data
+      YUNFAN_ALLOWED_HOSTS: ${YUNFAN_ALLOWED_HOSTS:-127.0.0.1,localhost,::1}
+      YUNFAN_CORS_ORIGINS: ${YUNFAN_CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,chrome-extension://jdacbgmhcbpkoccblehfahhoekjiiopl}
     volumes:
       - jobfit-data:/app/data
     restart: unless-stopped

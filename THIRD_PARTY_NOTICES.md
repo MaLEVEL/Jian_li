@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-JobFit references several openly licensed resume projects when designing its Chinese template catalog and product workflow. On 2026-11-18, the repository metadata reported the licenses below. JobFit does not copy upstream source code, images, icons, fonts, brand assets, or sample resume data. The template layouts in this repository are independently implemented in React, CSS, HTML print output, and DOCX generation.
+职启云帆 references several openly licensed resume projects when designing its Chinese template catalog and product workflow. On 2026-11-18, the repository metadata reported the licenses below. 职启云帆 does not copy upstream source code, images, icons, fonts, brand assets, or sample resume data. The template layouts in this repository are independently implemented in React, CSS, HTML print output, and DOCX generation.
 
 | Project | License | Repository |
 | --- | --- | --- |

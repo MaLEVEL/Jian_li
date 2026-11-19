@@ -20,7 +20,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error("JobFit AI crashed while rendering", error, info);
+    console.error("职启云帆 crashed while rendering", error, info);
   }
 
   render() {

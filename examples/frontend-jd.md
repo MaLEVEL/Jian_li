@@ -1,6 +1,6 @@
 # Frontend Engineer JD
 
-Company: JobFit Labs
+Company: 云帆科技
 
 We are looking for a frontend engineer who can build polished, maintainable web experiences with React and TypeScript. The role focuses on component-driven development, responsive layouts, form-heavy product workflows, and clear UI states for loading, success, empty, and error cases.
 

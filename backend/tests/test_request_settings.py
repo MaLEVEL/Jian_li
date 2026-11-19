@@ -91,7 +91,7 @@ def test_partial_override_headers_are_rejected_without_using_another_key(tmp_pat
 
 
 def test_server_api_key_environment_variable_is_ignored(monkeypatch, tmp_path):
-    monkeypatch.setenv('JOBFIT_API_KEY', 'must-not-be-read-from-environment')
+    monkeypatch.setenv('YUNFAN_API_KEY', 'must-not-be-read-from-environment')
     settings = Settings(_env_file=None, data_dir=tmp_path, llm_mode='auto')
 
     assert settings.api_key.get_secret_value() == ''

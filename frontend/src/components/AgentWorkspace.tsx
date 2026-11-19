@@ -396,7 +396,7 @@ export function AgentWorkspace({
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `jobfit-agent-batch-${new Date().toISOString().slice(0, 10)}.csv`;
+      link.download = `zhiqi-yunfan-agent-batch-${new Date().toISOString().slice(0, 10)}.csv`;
       document.body.appendChild(link);
       link.click();
       link.remove();

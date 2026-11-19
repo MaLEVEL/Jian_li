@@ -1,6 +1,6 @@
 # 业务 Skills：求职任务能力包
 
-这些技能在 JobFit 后端运行，面向使用产品的求职者。它们不是给编码助手安装的开发指南，也不会执行第三方脚本。
+这些技能在职启云帆后端运行，面向使用产品的求职者。它们不是给编码助手安装的开发指南，也不会执行第三方脚本。
 
 ## 使用方式
 
@@ -43,7 +43,7 @@
 
 每次业务技能只生成少量在线补充，固定输出预算为 1200 tokens。返回 `finish_reason=length` 时立即降级，保留上游已返回的实际 Token 用量，不对确定性截断反复重试；超时无法拿到用量时，不能把展示的 0 解释为未计费。
 
-Compose 透传 `JOBFIT_TIMEOUT_SECONDS`、`JOBFIT_MAX_RETRIES` 与可选 `JOBFIT_REASONING_EFFORT`。默认不发送 reasoning_effort；仅在服务商明确支持时填写。此次 GLM-5.3-FLASH 验收使用 `low`、60 秒超时、0 次重试，实际结果及警告以验证记录为准，未把 health 的 online 当成调用成功证明。
+Compose 透传 `YUNFAN_TIMEOUT_SECONDS`、`YUNFAN_MAX_RETRIES` 与可选 `YUNFAN_REASONING_EFFORT`。默认不发送 reasoning_effort；仅在服务商明确支持时填写。此次 GLM-5.3-FLASH 验收使用 `low`、60 秒超时、0 次重试，实际结果及警告以验证记录为准，未把 health 的 online 当成调用成功证明。
 
 主分析的有据输出只追加通过来源核对的逐字摘录；业务改写提案会检查来源、数字和技术词，但仍不构成通用语义真实性证明，必须人工审阅。生成的学习项/问题添加前缀后若超出 4000 字符则丢弃并告知，避免因超长导致 500；超长原文保留于来源，不截断后冒充完整事实。
 

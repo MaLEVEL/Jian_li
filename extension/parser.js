@@ -1,7 +1,7 @@
 (function (root, factory) {
   "use strict";
   var api = factory();
-  root.JobFitBossParser = api;
+  root.ZhiqiYunfanBossParser = api;
   if (typeof module === "object" && module.exports) {
     module.exports = api;
   }

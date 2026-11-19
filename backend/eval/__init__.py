@@ -1,1 +1,1 @@
-"""Offline evaluation package for the JobFit Python agent."""
+"""Offline evaluation package for the 职启云帆 Python agent."""

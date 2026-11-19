@@ -131,7 +131,7 @@ export const RESUME_TEMPLATE_CATALOG: readonly ResumeTemplateDefinition[] = [
     sectionOrder: ["intent", "summary", "education", "skills", "projects", "experience", "awards"],
     description: "教育背景、基础技能和课程项目顺序清楚，适合第一次完整投递。",
     version: "2.0.0",
-    source: { ...SOURCE_OPRESUME, note: "参考中文简历的本地优先与模块化信息层级，在 JobFit 中重新实现。" },
+    source: { ...SOURCE_OPRESUME, note: "参考中文简历的本地优先与模块化信息层级，在职启云帆中重新实现。" },
   },
   {
     id: "graduate-research",

@@ -1,1 +1,1 @@
-"""JobFit AI Python Agent."""
+"""职启云帆 Python Agent."""

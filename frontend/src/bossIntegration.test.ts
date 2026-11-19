@@ -123,7 +123,7 @@ describe("provider connection test", () => {
     expect(requestSignal?.aborted).toBe(false);
 
     await vi.advanceTimersByTimeAsync(53_999);
-    await expect(request).rejects.toThrow("浏览器无法连接本机 JobFit 服务，请确认 Docker 正在运行。");
+    await expect(request).rejects.toThrow("浏览器无法连接本机职启云帆服务，请确认 Docker 正在运行。");
     expect(requestSignal?.aborted).toBe(true);
 
     fetchMock.mockRestore();

@@ -14,7 +14,7 @@ DEFAULT_EXTENSION_ORIGIN = 'chrome-extension://jdacbgmhcbpkoccblehfahhoekjiiopl'
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=ROOT / '.env', extra='ignore', env_prefix='JOBFIT_')
+    model_config = SettingsConfigDict(env_file=ROOT / '.env', extra='ignore', env_prefix='YUNFAN_')
 
     base_url: str = 'https://open.bigmodel.cn/api/paas/v4/'
     model: str = 'glm-4-flash'
@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     def __init__(self, api_key: str | SecretStr | None = None, **data):
         """Accept an in-memory request key without creating a settings environment field.
 
-        `JOBFIT_API_KEY` is intentionally ignored: model credentials are stored by the
+        `YUNFAN_API_KEY` is intentionally ignored: model credentials are stored by the
         browser and arrive in request headers. Keeping the key as a private attribute
         prevents it from appearing in model dumps, settings files, or container config.
         """
