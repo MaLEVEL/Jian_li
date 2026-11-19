@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  BookOpenCheck,
   BriefcaseBusiness,
   CalendarClock,
   ClipboardPaste,
@@ -25,9 +26,11 @@ import {
   Plus,
 } from "lucide-react";
 import { ChangeEvent, CSSProperties, FormEvent, useMemo, useState } from "react";
+import { agentApi } from "./agentApi";
 import { RESUME_ACCENT_OPTIONS, RESUME_FONT_OPTIONS, getResumeFontOption, getResumeTemplateDefinition, isSidebarResumeLayout } from "./templateCatalog";
 import { RESUME_TEMPLATE_OPTIONS, STATUS_OPTIONS } from "./constants";
 import { EmptyState, Field, MetricCard, PanelTitle, TextArea } from "./components";
+import { TodayBoard, type TodayBoardInterview, type TodayBoardOpportunity, type TodayBoardTask } from "./components/TodayBoard";
 import {
   formatDate,
   getOrderedResumeSections,
@@ -44,6 +47,7 @@ import type {
   JobDraft,
   MatchReport,
   MatchPreview,
+  OpportunityRecord,
   ResumeContentPatch,
   ResumeAppearance,
   ResumeIdentity,
@@ -72,6 +76,13 @@ export function WorkspaceView({
   onGo,
   onLoadSampleUser,
   onRunDemoFlow,
+  todayTasks = [],
+  todayInterviews = [],
+  todayOpportunities = [],
+  onCompleteTodayTask,
+  onOpenTodayTask,
+  onOpenOpportunity,
+  onOpenInterviewPackage,
 }: {
   applications: ApplicationRecord[];
   latestApplication?: ApplicationRecord;
@@ -81,6 +92,13 @@ export function WorkspaceView({
   onGo: (tab: TabId) => void;
   onLoadSampleUser: () => void;
   onRunDemoFlow: () => void;
+  todayTasks?: TodayBoardTask[];
+  todayInterviews?: TodayBoardInterview[];
+  todayOpportunities?: TodayBoardOpportunity[];
+  onCompleteTodayTask?: (taskId: string) => void;
+  onOpenTodayTask?: (task: TodayBoardTask) => void;
+  onOpenOpportunity?: (opportunityId: string) => void;
+  onOpenInterviewPackage?: (opportunityId: string) => void;
 }) {
   const hasResume = resumes.length > 0;
   const hasApplication = applications.length > 0;
@@ -99,30 +117,18 @@ export function WorkspaceView({
 
   return (
     <div className="stack">
-      <section className="hero-panel">
-        <div>
-          <h2>把经历写成底气，<br />向更远的地方出发。</h2>
-          <p>
-            从一件做过的小事开始，把它写清楚，再带着它去遇见下一次机会。
-          </p>
-          <div className="hero-inline-actions"><button className="primary-button" type="button" onClick={() => onGo(hasResume ? "builder" : "profile")}>{hasResume ? "继续写我的简历" : "整理我的经历"}<ArrowUpRight size={18} /></button><button className="ghost-button" type="button" onClick={() => onGo("agent")}>分析目标岗位<ArrowUpRight size={17} /></button></div>
-        </div>
-        <svg className="hero-horizon" viewBox="0 0 640 240" preserveAspectRatio="none" fill="none" aria-hidden="true">
-          <circle cx="340" cy="58" r="29" fill="#FFE7A6" />
-          <path d="M0 188C90 152 119 180 192 158S299 179 382 157 531 150 640 108V240H0Z" fill="#BDDEF3" />
-          <path d="M0 222C129 176 195 222 310 202S504 179 640 198V240H0Z" fill="#95C8E8" />
-          <path d="M390 39l68-21-27 52-9-27-32-4Z" fill="white" stroke="#4286B0" strokeWidth="1.5" strokeLinejoin="round" />
-          <path d="m422 43 36-25" stroke="#4286B0" strokeWidth="1.5" />
-          <path d="M411 67c-33 9-29 37-62 41" stroke="#6FAACD" strokeWidth="1.5" strokeDasharray="5 6" />
-        </svg>
-        <div className="hero-document" aria-label="当前经历摘要">
-          <div className="hero-document__top"><FileText size={20} /><span>我的下一份简历</span></div>
-          <h3>{profile.name || "你的名字"}</h3><p>{profile.targetRole || "一个想尝试的方向"}</p>
-          <div className="hero-document__rule" />
-          <strong>我做过的项目</strong><p>{profile.projects.split("\n").find((line) => line.trim()) || "从你参与过的一件真实的事开始。"}</p>
-          <button type="button" onClick={() => onGo("builder")}>打开我的简历 <ArrowUpRight size={16} /></button>
-        </div>
-      </section>
+      <TodayBoard
+        tasks={todayTasks}
+        interviews={todayInterviews}
+        opportunities={todayOpportunities}
+        resume={resumes[0] ?? null}
+        greeting={`${profile.name ? `${profile.name}，` : ""}今天先推进最重要的一步。`}
+        onCompleteTask={onCompleteTodayTask}
+        onOpenTask={onOpenTodayTask}
+        onOpenOpportunity={onOpenOpportunity}
+        onOpenInterviewPackage={onOpenInterviewPackage}
+        onNavigate={onGo}
+      />
 
       <section className="template-invitation"><div><Shapes size={26} /><div><h2>表达也可以有自己的样子。</h2><p>选择简历版式，再用岗位提纲梳理想说的内容。</p></div></div><button className="secondary-button" type="button" onClick={() => onGo("templates")}>看看模板与提纲 <ArrowUpRight size={17} /></button></section>
 
@@ -326,7 +332,7 @@ export function BuilderView({
   onGo: (tab: TabId) => void;
   onCancelImport: () => void;
   onConfirmImport: () => void;
-  onImportDraftChange: (draft: ResumeImportDraft) => void;
+  onImportDraftChange: (draft: ResumeImportDraft | undefined) => void;
   onMarkReviewed: (id: string, reviewed: boolean) => void;
   onPreviewImport: () => void;
   onRename: (id: string) => void;
@@ -348,6 +354,29 @@ export function BuilderView({
   };
   const [activePane, setActivePane] = useState<"editor" | "preview">("editor");
   const [managerOpen, setManagerOpen] = useState(!selectedResume);
+  const [resumeUploading, setResumeUploading] = useState(false);
+  const [resumeUploadNotice, setResumeUploadNotice] = useState("");
+
+  async function handleResumeFileUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+    if (!file) return;
+    setResumeUploading(true);
+    setResumeUploadNotice(`正在解析 ${file.name}…`);
+    try {
+      const parsed = await agentApi.parseResume(file);
+      setPasteText(parsed.text);
+      if (!pasteTitle.trim() || pasteTitle === "我的已有简历") {
+        setPasteTitle(file.name.replace(/\.[^.]+$/, ""));
+      }
+      onImportDraftChange(undefined);
+      setResumeUploadNotice(`已解析 ${file.name}，请核对后保存为简历版本。`);
+    } catch (error) {
+      setResumeUploadNotice(error instanceof Error ? error.message : "简历解析失败，请改用 TXT 或文字版 PDF。");
+    } finally {
+      setResumeUploading(false);
+    }
+  }
   const switchToEditor = () => { setActivePane("editor"); setManagerOpen(false); };
   const switchToPreview = () => { setActivePane("preview"); setManagerOpen(false); };
 
@@ -432,8 +461,16 @@ export function BuilderView({
         <div className="version-manager__body">
 
         <div className="import-panel">
-          <strong>导入已有简历</strong>
+          <strong>上传或粘贴已有简历</strong>
           <label><span>导入后的版本名称</span><input value={pasteTitle} onChange={(event) => setPasteTitle(event.target.value)} placeholder="例如：Python 后端基础版" /></label>
+          <div className="resume-upload-row">
+            <label className="secondary-button file-button">
+              <Upload size={17} />
+              {resumeUploading ? "解析中…" : "上传 PDF / TXT"}
+              <input type="file" accept=".pdf,.txt,application/pdf,text/plain" onChange={handleResumeFileUpload} disabled={resumeUploading} />
+            </label>
+            <small>{resumeUploadNotice || "上传后会提取文字并进入下面的核对流程；之后可编辑、优化、匹配和导出。"}</small>
+          </div>
           <label><span>已有简历文本</span>
           <textarea
             value={pasteText}
@@ -783,13 +820,18 @@ export function OptimizerView({
 export function ApplicationsView({
   applications,
   resumes,
+  opportunities = [],
   onDelete,
   onDetailsChange,
   onRecalculate,
   onStatusChange,
+  onCompleteNextAction,
+  onRescheduleNextAction,
+  onOpenInterviewPackage,
 }: {
   applications: ApplicationRecord[];
   resumes: ResumeVersion[];
+  opportunities?: OpportunityRecord[];
   onDelete: (id: string) => void;
   onDetailsChange: (
     id: string,
@@ -797,6 +839,9 @@ export function ApplicationsView({
   ) => void;
   onRecalculate: (id: string) => void;
   onStatusChange: (id: string, status: ApplicationStatus) => void;
+  onCompleteNextAction?: (opportunityId: string, actionId: string) => void;
+  onRescheduleNextAction?: (opportunityId: string, dueAt: string) => void;
+  onOpenInterviewPackage?: (opportunityId: string) => void;
 }) {
   const [statusFilter, setStatusFilter] = useState<ApplicationStatus | "all">("all");
   const [searchTerm, setSearchTerm] = useState("");
@@ -846,9 +891,29 @@ export function ApplicationsView({
     [applications, normalizedSearch, statusFilter],
   );
 
+  function exportApplicationsCsv() {
+    const headers = ["company", "title", "status", "appliedAt", "followUpAt", "interviewAt", "channel", "contact", "score", "resume", "notes"];
+    const rows = visibleApplications.map((item) => [
+      item.job.company, item.job.title, STATUS_OPTIONS.find((option) => option.value === item.status)?.label ?? item.status,
+      item.appliedAt, item.followUpAt, item.interviewAt, item.channel, item.hrContact, String(item.report.score),
+      item.resumeTitle, item.notes,
+    ].map((value) => {
+      const raw = String(value ?? "");
+      const safe = /^[=+@-]/.test(raw) ? `'${raw}` : raw;
+      return `"${safe.replace(/"/g, '""')}"`;
+    }).join(","));
+    const blob = new Blob([`\ufeff${headers.join(",")}\n${rows.join("\n")}`], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `zhiqi-yunfan-applications-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
   return (
     <section className="panel">
-      <PanelTitle icon={<BriefcaseBusiness size={20} />} title="投递管理" />
+      <PanelTitle icon={<BriefcaseBusiness size={20} />} title="跟进" />
       {applications.length ? (
         <>
           <div className="crm-summary-grid">
@@ -936,11 +1001,15 @@ export function ApplicationsView({
             <strong>
               {visibleApplications.length}/{applications.length} 条
             </strong>
+            <button className="secondary-button" type="button" disabled={!visibleApplications.length} onClick={exportApplicationsCsv}>
+              <Download size={16} />导出投递记录
+            </button>
           </div>
           {visibleApplications.length ? (
             <div className="application-list">
               {visibleApplications.map((application) => {
                 const linkedResume = resumeLookup.get(application.resumeId);
+                const linkedOpportunity = opportunities.find((opportunity) => opportunity.applicationId === application.id);
                 const isStale =
                   linkedResume &&
                   new Date(linkedResume.updatedAt).getTime() > new Date(application.updatedAt).getTime();
@@ -978,6 +1047,33 @@ export function ApplicationsView({
                         <Trash2 size={17} />
                       </button>
                     </div>
+                    {linkedOpportunity?.nextAction ? (
+                      <section className="application-next-action" aria-label={`${application.job.company} 下一步`}>
+                        <div>
+                          <span>下一步</span>
+                          <strong>{linkedOpportunity.nextAction.title}</strong>
+                          <small>{linkedOpportunity.nextAction.completedAt ? "已完成" : formatDate(linkedOpportunity.nextAction.dueAt)}</small>
+                        </div>
+                        {!linkedOpportunity.nextAction.completedAt ? (
+                          <div className="application-next-action__actions">
+                            <input
+                              aria-label={`${application.job.company} 改期时间`}
+                              type="datetime-local"
+                              value={linkedOpportunity.nextAction.dueAt.slice(0, 16)}
+                              onChange={(event) => onRescheduleNextAction?.(linkedOpportunity.id, event.currentTarget.value)}
+                            />
+                            <button className="secondary-button" type="button" onClick={() => onCompleteNextAction?.(linkedOpportunity.id, linkedOpportunity.nextAction!.id)}>
+                              完成下一步
+                            </button>
+                          </div>
+                        ) : null}
+                        {(linkedOpportunity.stage === "interviewing" || linkedOpportunity.nextAction.kind === "prepare-interview") && onOpenInterviewPackage ? (
+                          <button className="primary-button" type="button" onClick={() => onOpenInterviewPackage(linkedOpportunity.id)}>
+                            <BookOpenCheck size={16} />打开面试包
+                          </button>
+                        ) : null}
+                      </section>
+                    ) : null}
                     <details className="application-details">
                       <summary>投递信息</summary>
                       <div className="application-detail-grid">

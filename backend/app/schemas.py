@@ -2,6 +2,7 @@ import json
 import re
 from datetime import datetime
 from typing import Annotated, Any, Literal
+from urllib.parse import parse_qsl, urlsplit
 
 from pydantic import (
     AnyHttpUrl,
@@ -217,22 +218,39 @@ _WORKSPACE_PROVIDER_KEYS = {'authorization', 'bearer', 'llmmode', 'apiendpoint',
 _WORKSPACE_SECRET_VALUE = re.compile(r'(?i)(?:\bsk-[a-z0-9_-]{8,}|\bbearer\s+[a-z0-9._-]{12,}|\b[a-z0-9_-]{20,}\.[a-z0-9_-]{10,}\b)')
 
 
+def _is_provider_config_key(key: Any) -> bool:
+    normalized = re.sub(r'[^a-z0-9]', '', str(key).casefold())
+    return (
+        any(part in normalized for part in _WORKSPACE_PROVIDER_KEY_PARTS)
+        or normalized.startswith('provider')
+        or normalized in _WORKSPACE_PROVIDER_KEYS
+    )
+
+
+def _url_contains_credentials(value: str) -> bool:
+    try:
+        parsed = urlsplit(value)
+    except ValueError:
+        return False
+    if not parsed.scheme or not parsed.netloc:
+        return False
+    if parsed.username is not None or parsed.password is not None:
+        return True
+    return any(
+        _is_provider_config_key(key)
+        for key, _ in parse_qsl(parsed.query, keep_blank_values=True)
+    )
+
+
 def _contains_provider_config(value: Any) -> bool:
     if isinstance(value, dict):
         for key, nested in value.items():
-            normalized = re.sub(r'[^a-z0-9]', '', str(key).casefold())
-            if (
-                any(part in normalized for part in _WORKSPACE_PROVIDER_KEY_PARTS)
-                or normalized.startswith('provider')
-                or normalized in _WORKSPACE_PROVIDER_KEYS
-            ):
-                return True
-            if _contains_provider_config(nested):
+            if _is_provider_config_key(key) or _contains_provider_config(nested):
                 return True
     elif isinstance(value, list):
         return any(_contains_provider_config(item) for item in value)
     elif isinstance(value, str):
-        return bool(_WORKSPACE_SECRET_VALUE.search(value))
+        return bool(_WORKSPACE_SECRET_VALUE.search(value)) or _url_contains_credentials(value)
     return False
 
 
@@ -315,10 +333,69 @@ class WorkspaceResume(WorkspaceModel):
     updatedAt: str = Field(min_length=1, max_length=100)
 
 
+OpportunityStage = Literal[
+    'new',
+    'saved',
+    'tailoring',
+    'applied',
+    'communicating',
+    'interviewing',
+    'offer',
+    'unsuitable',
+    'closed',
+]
+JobSource = Literal['workspace', 'boss', 'manual', 'csv']
+
+
+class WorkspaceNextAction(WorkspaceModel):
+    id: str = Field(min_length=1, max_length=128)
+    kind: Literal[
+        'follow-up',
+        'tailor-resume',
+        'prepare-interview',
+        'review',
+        'compare-offer',
+    ]
+    title: str = Field(min_length=1, max_length=300)
+    dueAt: str = Field(min_length=1, max_length=100)
+    completedAt: str | None = Field(default=None, max_length=100)
+    createdAt: str = Field(min_length=1, max_length=100)
+
+
 class WorkspaceJob(WorkspaceModel):
     company: str = Field(max_length=300)
     title: str = Field(max_length=300)
     description: str = Field(max_length=100000)
+    location: str | None = Field(
+        default=None,
+        max_length=300,
+        exclude_if=lambda value: value is None,
+    )
+    salary: str | None = Field(
+        default=None,
+        max_length=120,
+        exclude_if=lambda value: value is None,
+    )
+    source: JobSource | None = Field(default=None, exclude_if=lambda value: value is None)
+    sourceJobId: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=128,
+        exclude_if=lambda value: value is None,
+    )
+    sourceUrl: BossSourceUrl | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+    )
+
+    @field_validator('sourceUrl')
+    @classmethod
+    def validate_source_url(cls, value: AnyHttpUrl | None) -> AnyHttpUrl | None:
+        if value is None:
+            return value
+        if value.username is not None or value.password is not None:
+            raise ValueError('来源链接不能包含凭据')
+        return value
 
 
 class WorkspaceMatchReport(WorkspaceModel):
@@ -357,12 +434,105 @@ class WorkspaceApplication(WorkspaceModel):
     questions: WorkspaceInterviewQuestions
     createdAt: str = Field(min_length=1, max_length=100)
     updatedAt: str = Field(min_length=1, max_length=100)
+    nextAction: WorkspaceNextAction | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+    )
+    stageChangedAt: str | None = Field(
+        default=None,
+        max_length=100,
+        exclude_if=lambda value: value is None,
+    )
+
+
+class WorkspaceOpportunity(WorkspaceModel):
+    id: str = Field(min_length=1, max_length=128)
+    job: WorkspaceJob
+    stage: OpportunityStage
+    nextAction: WorkspaceNextAction | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+    )
+    source: JobSource
+    sourceJobId: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=128,
+        exclude_if=lambda value: value is None,
+    )
+    sourceUrl: BossSourceUrl | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+    )
+    channel: str = Field(default='', max_length=300)
+    contact: str = Field(default='', max_length=1000)
+    notes: str = Field(default='', max_length=100000)
+    applicationId: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=128,
+        exclude_if=lambda value: value is None,
+    )
+    resumeId: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=128,
+        exclude_if=lambda value: value is None,
+    )
+    createdAt: str = Field(min_length=1, max_length=100)
+    updatedAt: str = Field(min_length=1, max_length=100)
+    stageChangedAt: str | None = Field(
+        default=None,
+        max_length=100,
+        exclude_if=lambda value: value is None,
+    )
+
+    @field_validator('sourceUrl')
+    @classmethod
+    def validate_source_url(cls, value: AnyHttpUrl | None) -> AnyHttpUrl | None:
+        if value is None:
+            return value
+        if value.username is not None or value.password is not None:
+            raise ValueError('来源链接不能包含凭据')
+        return value
+
+
+class WorkspaceSavedJobView(WorkspaceModel):
+    id: str = Field(min_length=1, max_length=128)
+    name: str = Field(min_length=1, max_length=300)
+    query: str | None = Field(
+        default=None,
+        max_length=1000,
+        exclude_if=lambda value: value is None,
+    )
+    stages: list[OpportunityStage] | None = Field(
+        default=None,
+        max_length=9,
+        exclude_if=lambda value: value is None,
+    )
+    source: JobSource | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+    )
+
+
+class WorkspaceJobPool(WorkspaceModel):
+    savedViews: list[WorkspaceSavedJobView] = Field(default_factory=list, max_length=5)
 
 
 class WorkspaceState(WorkspaceModel):
     profile: WorkspaceProfile
     resumes: list[WorkspaceResume] = Field(default_factory=list, max_length=100)
     applications: list[WorkspaceApplication] = Field(default_factory=list, max_length=1000)
+    opportunities: list[WorkspaceOpportunity] | None = Field(
+        default=None,
+        max_length=1000,
+        exclude_if=lambda value: value is None,
+    )
+    jobPool: WorkspaceJobPool | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+    )
     version: Literal[1]
     exportedAt: str | None = Field(default=None, max_length=100)
 

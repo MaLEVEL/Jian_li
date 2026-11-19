@@ -17,6 +17,8 @@ const state: WorkspaceStatePayload = {
   profile: DEFAULT_PROFILE,
   resumes: [],
   applications: [],
+  opportunities: [],
+  jobPool: { savedViews: [] },
 };
 
 afterEach(() => vi.restoreAllMocks());

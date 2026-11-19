@@ -15,6 +15,7 @@ import {
   Settings2,
   ShieldCheck,
   Sparkles,
+  Target,
   Trash2,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -30,24 +31,42 @@ import {
   saveProviderSettings,
   testProviderConnection,
 } from "../bossIntegration";
-import type { ResumeVersion, TabId } from "../types";
+import type { OpportunityRecord, ResumeVersion, SavedJobView, TabId } from "../types";
+import {
+  OpportunityCenter,
+  type OpportunityHandlers,
+  type OpportunityCenterRecord,
+} from "./OpportunityCenter";
 import "./IntegrationCenter.css";
 
-const INTEGRATION_SECTIONS = ["guide", "jobs", "settings"] as const;
-type SectionId = (typeof INTEGRATION_SECTIONS)[number];
+export type IntegrationSection = "funnel" | "guide" | "jobs" | "settings";
+const INTEGRATION_SECTIONS: IntegrationSection[] = ["funnel", "guide", "jobs"];
 type Notice = { type: "success" | "warning" | "error"; text: string };
 const JOB_PAGE_SIZE = 30;
 
 export function IntegrationCenter({
+  section,
   selectedResume,
+  onSectionChange,
   onGo,
   onUseJob,
+  onAddJobToFunnel,
+  opportunities,
+  savedViews,
+  opportunityHandlers,
+  onDeleteSavedView,
 }: {
+  section: IntegrationSection;
   selectedResume?: ResumeVersion;
+  onSectionChange: (section: IntegrationSection) => void;
   onGo: (tab: TabId) => void;
   onUseJob: (job: BossJobRecord) => void;
+  onAddJobToFunnel: (job: BossJobRecord) => void;
+  opportunities: OpportunityCenterRecord[];
+  savedViews: SavedJobView[];
+  opportunityHandlers: OpportunityHandlers;
+  onDeleteSavedView: (viewId: string) => void;
 }) {
-  const [section, setSection] = useState<SectionId>("guide");
   const [health, setHealth] = useState<BossIntegrationHealth>();
   const [jobs, setJobs] = useState<BossJobRecord[]>([]);
   const [totalJobs, setTotalJobs] = useState(0);
@@ -115,7 +134,7 @@ export function IntegrationCenter({
     }
     event.preventDefault();
     const nextSection = INTEGRATION_SECTIONS[nextIndex];
-    setSection(nextSection);
+    onSectionChange(nextSection);
     document.getElementById(`integration-tab-${nextSection}`)?.focus();
   }
 
@@ -196,7 +215,7 @@ export function IntegrationCenter({
 
   const workflow = [
     { title: "启动本机服务", text: "在项目根目录运行 Docker 后，开发者模式下加载 extension 文件夹。", action: () => onGo("workspace"), icon: <PlugZap size={20} /> },
-    { title: "配置个人 API", text: "填写兼容 OpenAI 的地址、模型和密钥；密钥只留在当前浏览器。", action: () => setSection("settings"), icon: <Settings2 size={20} /> },
+    { title: "配置个人 API", text: "填写兼容 OpenAI 的地址、模型和密钥；密钥只留在当前浏览器。", action: () => onSectionChange("settings"), icon: <Settings2 size={20} /> },
     { title: "整理真实经历", text: "先在经历库确认项目、技能和工作经历，AI 不会把缺失项写成事实。", action: () => onGo("profile"), icon: <FileText size={20} /> },
     { title: "去 BOSS 采集职位", text: "登录 BOSS、打开搜索结果或职位详情，再点击扩展里的采集按钮。", action: () => window.open("https://www.zhipin.com/web/geek/job", "_blank", "noopener,noreferrer"), icon: <Cable size={20} /> },
     { title: "查看匹配并定制", text: "从职位池带入 JD 匹配，选择更适合的简历版式与内容。", action: () => onGo("optimizer"), icon: <Search size={20} /> },
@@ -207,9 +226,9 @@ export function IntegrationCenter({
     <div className="integration-center">
       <section className="integration-hero" aria-labelledby="integration-title">
         <div>
-          <span className="integration-eyebrow"><Cable size={16} /> BOSS 职位接入中心</span>
-          <h2 id="integration-title">你把时间留给选择，重复粘贴交给系统。</h2>
-          <p>从 BOSS 当前页面带回真实可见的岗位，在本机去重、匹配和整理。最终投递与打招呼始终由你确认。</p>
+          <span className="integration-eyebrow"><Cable size={16} /> 机会中心 · BOSS 职位收件箱</span>
+          <h2 id="integration-title">先判断什么值得投入，再推进下一步。</h2>
+          <p>机会漏斗保存你的判断；BOSS 职位池仍是收件箱。加入漏斗、完成跟进和打开面试包都需要你明确操作。</p>
         </div>
         <div className="integration-health" aria-live="polite">
           <span className={`integration-health__dot ${health ? "is-online" : ""}`} />
@@ -231,11 +250,11 @@ export function IntegrationCenter({
         </div>
       ) : null}
 
-      <div className="integration-tabs" role="tablist" aria-label="BOSS 接入功能" onKeyDown={handleSectionKeyDown}>
+      <div className="integration-tabs" role="tablist" aria-label="机会中心页面" onKeyDown={handleSectionKeyDown}>
         {([
-          ["guide", "接入教程"],
-          ["jobs", `职位池${totalJobs ? ` · ${totalJobs}` : ""}`],
-          ["settings", "API 配置"],
+          ["funnel", "机会漏斗"],
+          ["jobs", `BOSS 职位收件箱${totalJobs ? ` · ${totalJobs}` : ""}`],
+          ["guide", "接入说明"],
         ] as const).map(([value, label]) => (
           <button
             aria-controls={`integration-panel-${value}`}
@@ -245,12 +264,41 @@ export function IntegrationCenter({
             role="tab"
             tabIndex={section === value ? 0 : -1}
             type="button"
-            onClick={() => setSection(value)}
+            onClick={() => onSectionChange(value)}
           >
             {label}
           </button>
         ))}
       </div>
+
+      {section === "funnel" ? (
+        <section
+          aria-labelledby="integration-tab-funnel"
+          className="integration-panel integration-opportunity-panel"
+          id="integration-panel-funnel"
+          role="tabpanel"
+        >
+          <OpportunityCenter
+            opportunities={opportunities}
+            savedViews={savedViews}
+            handlers={opportunityHandlers}
+            title="今天要推进的机会"
+            description="从中筛选、定材料、跟进和准备面试；所有投递与沟通动作仍由你确认。"
+          />
+          {savedViews.length ? (
+            <details className="integration-saved-view-manager">
+              <summary>管理已保存筛选视图（{savedViews.length}/5）</summary>
+              <div>
+                {savedViews.map((view) => (
+                  <button key={view.id} type="button" className="ghost-button" onClick={() => onDeleteSavedView(view.id)}>
+                    <Trash2 size={15} />删除“{view.name}”
+                  </button>
+                ))}
+              </div>
+            </details>
+          ) : null}
+        </section>
+      ) : null}
 
       {section === "guide" ? (
         <section aria-labelledby="integration-tab-guide" className="integration-panel integration-guide" id="integration-panel-guide" role="tabpanel">
@@ -317,7 +365,7 @@ export function IntegrationCenter({
               <Cable size={30} />
               <strong>职位池还是空的</strong>
               <p>在 BOSS 页面打开搜索结果或职位详情，然后点击浏览器扩展里的“采集当前页”。</p>
-              <button className="primary-button" type="button" onClick={() => setSection("guide")}>查看接入教程</button>
+              <button className="primary-button" type="button" onClick={() => onSectionChange("guide")}>查看接入教程</button>
             </div>
           ) : (
             <div className="integration-job-list" aria-live="polite">
@@ -345,7 +393,10 @@ export function IntegrationCenter({
                   </div>
                   <p>{job.description || "扩展没有读取到职位描述，请打开 BOSS 详情页重新采集。"}</p>
                   <div className="integration-job__actions">
-                    <button className="primary-button" type="button" onClick={() => onUseJob(job)}>
+                    <button className="primary-button" type="button" onClick={() => onAddJobToFunnel(job)}>
+                      <Target size={16} />加入机会漏斗
+                    </button>
+                    <button className="secondary-button" type="button" onClick={() => onUseJob(job)}>
                       <Search size={16} />用这份 JD 匹配
                     </button>
                     <button className="secondary-button" type="button" onClick={() => onGo("builder")}>
@@ -373,9 +424,9 @@ export function IntegrationCenter({
       ) : null}
 
       {section === "settings" ? (
-        <section aria-labelledby="integration-tab-settings" className="integration-panel" id="integration-panel-settings" role="tabpanel">
+        <section aria-label="API 配置" className="integration-panel" id="integration-panel-settings" role="tabpanel">
           <div className="integration-section-heading">
-            <div><span>只保存在当前浏览器</span><h3>AI 接口配置</h3></div>
+            <div><span>只保存在当前浏览器 · 从更多任务进入</span><h3>AI 接口配置</h3></div>
             <span className="integration-lock"><ShieldCheck size={15} />不进入服务器数据库</span>
           </div>
           <form className="integration-settings" onSubmit={(event) => { event.preventDefault(); void saveSettings(); }}>

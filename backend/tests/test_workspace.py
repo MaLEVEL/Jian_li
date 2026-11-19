@@ -124,6 +124,63 @@ def application_record(**changes):
     }
 
 
+def next_action_record(**changes):
+    return {
+        'id': 'action-1',
+        'kind': 'follow-up',
+        'title': '联系招聘负责人',
+        'dueAt': '2026-11-20T10:00:00.000Z',
+        'completedAt': None,
+        'createdAt': '2026-11-18T11:00:00.000Z',
+        **changes,
+    }
+
+
+def workspace_job_record(**changes):
+    return {
+        'company': '示例公司',
+        'title': 'Python 后端工程师',
+        'description': '',
+        'location': '上海',
+        'salary': '25-40K',
+        'source': 'boss',
+        'sourceJobId': 'boss-job-1',
+        'sourceUrl': 'https://www.zhipin.com/job_detail/boss-job-1.html',
+        **changes,
+    }
+
+
+def opportunity_record(**changes):
+    return {
+        'id': 'opportunity-1',
+        'job': workspace_job_record(),
+        'stage': 'tailoring',
+        'nextAction': next_action_record(),
+        'source': 'manual',
+        'sourceJobId': 'manual-opportunity-1',
+        'sourceUrl': 'https://jobs.example.com/roles/1',
+        'channel': '官网',
+        'contact': '招聘负责人',
+        'notes': '优先准备 Python 服务案例。',
+        'applicationId': 'application-1',
+        'createdAt': '2026-11-18T10:00:00.000Z',
+        'updatedAt': '2026-11-18T11:00:00.000Z',
+        'stageChangedAt': '2026-11-18T11:00:00.000Z',
+        **changes,
+    }
+
+
+def saved_view_record(**changes):
+    return {
+        'id': 'view-1',
+        'name': '上海 Python',
+        'query': 'Python',
+        'stages': ['tailoring', 'applied'],
+        'source': 'boss',
+        **changes,
+    }
+
+
 def put_workspace(client, state, expected_revision):
     return client.put('/api/workspace', json={
         'state': state,
@@ -172,6 +229,124 @@ def test_workspace_accepts_complete_frontend_camel_case_payload(client):
     assert stored['state']['resumes'][0]['appearance']['fontFamily'] == 'sans'
     assert stored['state']['applications'][0]['report']['matchedKeywords'] == ['Python', 'FastAPI']
     assert stored['state']['applications'][0]['questions']['technical'] == ['如何设计幂等 upsert？']
+
+
+def test_workspace_accepts_v1_workflow_contract(client):
+    state = workspace_state(
+        opportunities=[opportunity_record()],
+        jobPool={'savedViews': [saved_view_record()]},
+        applications=[application_record(
+            nextAction=next_action_record(),
+            stageChangedAt='2026-11-18T11:00:00.000Z',
+        )],
+    )
+
+    response = put_workspace(client, state, None)
+
+    assert response.status_code == 200, response.text
+    assert response.json()['state'] == state
+
+
+def test_legacy_workspace_omits_unset_v1_fields(client):
+    state = workspace_state(applications=[application_record()])
+
+    response = put_workspace(client, state, None)
+
+    assert response.status_code == 200, response.text
+    stored = response.json()['state']
+    assert 'opportunities' not in stored
+    assert 'jobPool' not in stored
+    assert 'nextAction' not in stored['applications'][0]
+    assert 'stageChangedAt' not in stored['applications'][0]
+    assert 'source' not in stored['applications'][0]['job']
+    assert 'sourceJobId' not in stored['applications'][0]['job']
+    assert 'sourceUrl' not in stored['applications'][0]['job']
+
+
+@pytest.mark.parametrize('state', [
+    workspace_state(opportunities=[opportunity_record(unexpected='value')]),
+    workspace_state(opportunities=[opportunity_record(
+        nextAction=next_action_record(unexpected='value'),
+    )]),
+    workspace_state(opportunities=[opportunity_record(
+        job=workspace_job_record(unexpected='value'),
+    )]),
+    workspace_state(jobPool={'savedViews': [saved_view_record(unexpected='value')]}),
+    workspace_state(jobPool={'savedViews': [], 'unexpected': 'value'}),
+    workspace_state(applications=[application_record(
+        nextAction=next_action_record(unexpected='value'),
+    )]),
+])
+def test_workspace_v1_rejects_unknown_fields(client, state):
+    response = put_workspace(client, state, None)
+
+    assert response.status_code == 422
+    assert client.get('/api/workspace').status_code == 404
+
+
+@pytest.mark.parametrize('state', [
+    workspace_state(opportunities=[opportunity_record(stage='archived')]),
+    workspace_state(opportunities=[opportunity_record(source='linkedin')]),
+    workspace_state(opportunities=[opportunity_record(job=workspace_job_record(source='linkedin'))]),
+    workspace_state(opportunities=[opportunity_record(
+        nextAction=next_action_record(kind='follow_up'),
+    )]),
+])
+def test_workspace_v1_rejects_invalid_workflow_values(client, state):
+    response = put_workspace(client, state, None)
+
+    assert response.status_code == 422
+
+
+def test_workspace_v1_allows_at_most_five_saved_job_views(client):
+    state = workspace_state(jobPool={
+        'savedViews': [saved_view_record(id=f'view-{index}') for index in range(6)],
+    })
+
+    response = put_workspace(client, state, None)
+
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize('state', [
+    workspace_state(opportunities=[opportunity_record(
+        nextAction=next_action_record(title='Bearer abcdefghijklmnopqrstuvwxyz'),
+    )]),
+    workspace_state(jobPool={'savedViews': [saved_view_record(query='sk-live-secret-value')]}),
+    workspace_state(opportunities=[opportunity_record(
+        job=workspace_job_record(sourceUrl='https://user:password@example.com/job'),
+    )]),
+    workspace_state(opportunities=[opportunity_record(
+        sourceUrl='https://jobs.example.com/role?access_token=workspace-secret',
+    )]),
+    workspace_state(opportunities=[opportunity_record(
+        job=workspace_job_record(sourceUrl='https://jobs.example.com/role?api_key=workspace-secret'),
+    )]),
+])
+def test_workspace_v1_provider_and_credential_scanning_still_applies(client, state):
+    response = put_workspace(client, state, None)
+
+    assert response.status_code == 422
+    assert 'secret' not in response.text
+    assert 'password' not in response.text
+
+
+def test_workspace_v1_fields_count_toward_two_megabyte_limit(client):
+    opportunities = [
+        opportunity_record(
+            id=f'opportunity-{index}',
+            job=workspace_job_record(
+                sourceJobId=f'boss-job-{index}',
+                description='x' * 100_000,
+            ),
+        )
+        for index in range((MAX_STATE_BYTES // 100_000) + 1)
+    ]
+
+    response = put_workspace(client, workspace_state(opportunities=opportunities), None)
+
+    assert response.status_code == 422
+    assert client.get('/api/workspace').status_code == 404
 
 
 def test_workspace_stale_revision_returns_409_with_current_envelope(client):

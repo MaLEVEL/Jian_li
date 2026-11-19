@@ -246,3 +246,63 @@ export interface ApplicationRecord {
   createdAt: string;
   updatedAt: string;
 }
+
+export type OpportunityStage =
+  | "new"
+  | "saved"
+  | "tailoring"
+  | "applied"
+  | "communicating"
+  | "interviewing"
+  | "offer"
+  | "unsuitable"
+  | "closed";
+
+export type OpportunitySource = "workspace" | "boss" | "manual" | "csv";
+
+export type ApplicationNextActionKind =
+  | "review"
+  | "tailor-resume"
+  | "follow-up"
+  | "prepare-interview"
+  | "compare-offer";
+
+export interface ApplicationNextAction {
+  id: string;
+  kind: ApplicationNextActionKind;
+  title: string;
+  dueAt: string;
+  completedAt?: string;
+  createdAt: string;
+}
+
+export interface OpportunityJob extends JobDraft {
+  location?: string;
+  salary?: string;
+}
+
+export interface OpportunityRecord {
+  id: string;
+  stage: OpportunityStage;
+  job: OpportunityJob;
+  source: OpportunitySource;
+  sourceJobId?: string;
+  sourceUrl?: string;
+  applicationId?: string;
+  resumeId?: string;
+  channel: string;
+  contact: string;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+  stageChangedAt?: string;
+  nextAction?: ApplicationNextAction;
+}
+
+export interface SavedJobView {
+  id: string;
+  name: string;
+  query?: string;
+  stages?: OpportunityStage[];
+  source?: OpportunitySource;
+}

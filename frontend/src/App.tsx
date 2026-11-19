@@ -3,16 +3,19 @@ import {
   ScanSearch,
   BriefcaseBusiness,
   Cable,
-  Download,
   LayoutDashboard,
   Library,
   Search,
   Settings,
-  Upload,
   FileText,
   Shapes,
   Menu,
   X,
+  CalendarDays,
+  ChevronDown,
+  ListTodo,
+  MoreHorizontal,
+  Target,
 } from "lucide-react";
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DEFAULT_PROFILE, EMPTY_JOB, SAMPLE_FRONTEND_JOB } from "./constants";
@@ -57,16 +60,30 @@ import type {
   CandidateProfile,
   JobDraft,
   MatchPreview,
+  OpportunityRecord,
+  OpportunityStage,
   ResumeContentPatch,
   ResumeImportDraft,
   ResumeTemplate,
   ResumeVersion,
+  SavedJobView,
   TabId,
 } from "./types";
 import { AgentWorkspace } from "./components/AgentWorkspace";
 import { IntegrationCenter } from "./components/IntegrationCenter";
+import type { IntegrationSection } from "./components/IntegrationCenter";
+import { InterviewPackage } from "./components/InterviewPackage";
 import { TemplateLibrary } from "./components/TemplateLibrary";
+import type { OpportunityHandlers, OpportunityCenterRecord } from "./components/OpportunityCenter";
 import { ApplicationsView, BuilderView, OptimizerView, ProfileView, WorkspaceView } from "./views";
+import {
+  createDefaultNextAction,
+  createManualOpportunity,
+  generateRuleBasedInterviewPackage,
+  groupApplicationTasks,
+  OPPORTUNITY_STAGE_LABELS,
+  parseOpportunityCsv,
+} from "./opportunityPipeline";
 
 function normalizeJobKey(job: JobDraft) {
   return [job.company, job.title].map((value) => value.trim().toLowerCase()).join("::");
@@ -88,6 +105,17 @@ function getBaseResumeId(resume?: ResumeVersion) {
   return resume?.parentResumeId ?? resume?.id ?? "";
 }
 
+const APPLICATION_STATUS_BY_OPPORTUNITY_STAGE: Partial<Record<OpportunityStage, ApplicationStatus>> = {
+  new: "saved",
+  saved: "saved",
+  tailoring: "saved",
+  applied: "applied",
+  communicating: "screening",
+  interviewing: "interviewing",
+  offer: "offer",
+  closed: "rejected",
+};
+
 interface AppMessage {
   id: number;
   text: string;
@@ -108,9 +136,14 @@ export default function App() {
   const [workspaceConflict, setWorkspaceConflict] = useState<WorkspaceEnvelope | undefined>();
   const [activeTab, setActiveTab] = useState<TabId>("workspace");
   const [navExpanded, setNavExpanded] = useState(false);
+  const [mobilePanel, setMobilePanel] = useState<"materials" | "more" | null>(null);
+  const [integrationSection, setIntegrationSection] = useState<IntegrationSection>("funnel");
+  const [interviewOpportunityId, setInterviewOpportunityId] = useState("");
   const [profile, setProfile] = useState<CandidateProfile>(storedState.profile);
   const [resumes, setResumes] = useState<ResumeVersion[]>(storedState.resumes);
   const [applications, setApplications] = useState<ApplicationRecord[]>(storedState.applications);
+  const [opportunities, setOpportunities] = useState<OpportunityRecord[]>(storedState.opportunities);
+  const [jobPool, setJobPool] = useState(storedState.jobPool);
   const [selectedResumeId, setSelectedResumeId] = useState(storedState.resumes[0]?.id ?? "");
   const [jobDraft, setJobDraft] = useState<JobDraft>(EMPTY_JOB);
   const [matchPreview, setMatchPreview] = useState<MatchPreview | undefined>();
@@ -130,8 +163,102 @@ export default function App() {
   );
   const latestApplication = applications[0];
   const workspacePayload = useMemo<WorkspaceStatePayload>(
-    () => createStoredPayload(profile, resumes, applications),
-    [applications, profile, resumes],
+    () => createStoredPayload(profile, resumes, applications, opportunities, jobPool),
+    [applications, jobPool, opportunities, profile, resumes],
+  );
+
+  const opportunityCenterRecords = useMemo<OpportunityCenterRecord[]>(() => {
+    const applicationsById = new Map(applications.map((application) => [application.id, application]));
+    const resumesById = new Map(resumes.map((resume) => [resume.id, resume]));
+    return opportunities.map((opportunity) => {
+      const application = opportunity.applicationId ? applicationsById.get(opportunity.applicationId) : undefined;
+      const resume = opportunity.resumeId ? resumesById.get(opportunity.resumeId) : undefined;
+      return {
+        ...opportunity,
+        ...(application ? {
+          application: {
+            id: application.id,
+            status: application.status,
+            appliedAt: application.appliedAt,
+            followUpAt: application.followUpAt,
+            interviewAt: application.interviewAt,
+            channel: application.channel,
+            hrContact: application.hrContact,
+            notes: application.notes,
+            report: application.report,
+          },
+        } : {}),
+        ...(resume ? { resume: { id: resume.id, title: resume.title, targetRole: resume.targetRole } } : {}),
+      };
+    });
+  }, [applications, opportunities, resumes]);
+  const taskGroups = useMemo(
+    () => groupApplicationTasks(opportunities, applications),
+    [applications, opportunities],
+  );
+  const todayTasks = useMemo(
+    () => [...taskGroups.overdue, ...taskGroups.today, ...taskGroups.next7Days].map((item) => ({
+      id: `${item.opportunity.id}::${item.action.id}`,
+      title: item.action.title,
+      detail: `${item.opportunity.job.company} · ${item.opportunity.job.title}`,
+      dueAt: item.dueAt,
+      kind: item.action.kind === "tailor-resume"
+        ? "resume" as const
+        : item.action.kind === "prepare-interview"
+          ? "interview" as const
+          : item.action.kind === "follow-up"
+            ? "follow-up" as const
+            : "review" as const,
+      priority: item.daysAhead < 0 ? "high" as const : "normal" as const,
+      opportunityId: item.opportunity.id,
+    })),
+    [taskGroups],
+  );
+  const todayInterviews = useMemo(
+    () => applications
+      .filter((application) => application.interviewAt)
+      .map((application) => ({
+        id: application.id,
+        company: application.job.company,
+        title: application.job.title,
+        at: application.interviewAt,
+        format: "video" as const,
+        opportunityId: opportunities.find((opportunity) => opportunity.applicationId === application.id)?.id,
+      })),
+    [applications, opportunities],
+  );
+  const todayOpportunities = useMemo(
+    () => opportunities
+      .filter((opportunity) => opportunity.stage !== "unsuitable" && opportunity.stage !== "closed")
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+      .map((opportunity) => ({
+        id: opportunity.id,
+        company: opportunity.job.company,
+        title: opportunity.job.title,
+        stageLabel: OPPORTUNITY_STAGE_LABELS[opportunity.stage],
+        nextStep: opportunity.nextAction?.completedAt ? "下一步已完成" : opportunity.nextAction?.title,
+      })),
+    [opportunities],
+  );
+  const currentInterviewOpportunity = useMemo(
+    () => opportunities.find((opportunity) => opportunity.id === interviewOpportunityId),
+    [interviewOpportunityId, opportunities],
+  );
+  const currentInterviewApplication = useMemo(
+    () => currentInterviewOpportunity?.applicationId
+      ? applications.find((application) => application.id === currentInterviewOpportunity.applicationId)
+      : undefined,
+    [applications, currentInterviewOpportunity],
+  );
+  const currentInterviewResume = useMemo(
+    () => resumes.find((resume) => resume.id === (currentInterviewOpportunity?.resumeId || currentInterviewApplication?.resumeId)),
+    [currentInterviewApplication?.resumeId, currentInterviewOpportunity?.resumeId, resumes],
+  );
+  const currentInterviewPackage = useMemo(
+    () => currentInterviewOpportunity
+      ? generateRuleBasedInterviewPackage(currentInterviewOpportunity, { application: currentInterviewApplication })
+      : undefined,
+    [currentInterviewApplication, currentInterviewOpportunity],
   );
 
   function setMessage(text: string, type: StatusMessageType = "success") {
@@ -140,15 +267,15 @@ export default function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(createStoredPayload(profile, resumes, applications)));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(createStoredPayload(profile, resumes, applications, opportunities, jobPool)));
       if (workspaceReady && !skipWorkspaceSave.current && !suppressNextWorkspaceSave.current) {
         markWorkspaceDirty(workspaceRevision.current);
       }
     } catch (error) {
       console.error("Failed to save local 职启云帆 data", error);
-      setMessage("本地保存失败：浏览器存储可能已满、被隐私模式限制，或简历文本过长。请先导出数据备份。", "error");
+      setMessage("本地保存失败：浏览器存储可能已满、被隐私模式限制，或简历文本过长。请先在对应页面导出当前数据，再清理浏览器存储。", "error");
     }
-  }, [applications, profile, resumes]);
+  }, [applications, jobPool, opportunities, profile, resumes]);
   useEffect(() => {
     let cancelled = false;
     async function hydrateFromWorkspace() {
@@ -172,6 +299,8 @@ export default function App() {
             setProfile(restored.profile);
             setResumes(restored.resumes);
             setApplications(restored.applications);
+            setOpportunities(restored.opportunities);
+            setJobPool(restored.jobPool);
             setSelectedResumeId(restored.resumes[0]?.id ?? "");
             markWorkspaceClean(remote.revision);
             setWorkspaceSync("saved");
@@ -182,7 +311,7 @@ export default function App() {
           }
         } else {
           const created = await workspaceApi.save(
-            createStoredPayload(profile, resumes, applications),
+            createStoredPayload(profile, resumes, applications, opportunities, jobPool),
             null,
           );
           if (cancelled) return;
@@ -270,6 +399,8 @@ export default function App() {
     setProfile(restored.profile);
     setResumes(restored.resumes);
     setApplications(restored.applications);
+    setOpportunities(restored.opportunities);
+    setJobPool(restored.jobPool);
     setSelectedResumeId(restored.resumes[0]?.id ?? "");
     workspaceRevision.current = workspaceConflict.revision;
     workspaceSyncBlocked.current = false;
@@ -607,7 +738,18 @@ export default function App() {
             : application,
         ),
       );
-      setMessage("已更新同公司同岗位的投递记录，没有重复新增。");
+      setOpportunities((current) => current.map((opportunity) =>
+        opportunity.applicationId === existingApplication.id
+          ? {
+              ...opportunity,
+              job: { ...matchPreview.job },
+              resumeId: previewResume.id,
+              applicationId: existingApplication.id,
+              updatedAt: now,
+            }
+          : opportunity,
+      ));
+      setMessage("已更新同公司同岗位的投递记录，机会漏斗保持原状态。");
       return;
     }
 
@@ -630,7 +772,29 @@ export default function App() {
     };
 
     setApplications((current) => [application, ...current]);
-    setMessage("已保存为投递记录，后续可在投递管理里补充渠道、跟进时间和备注。");
+    const linkedOpportunity = opportunities.find((opportunity) =>
+      normalizeJobKey(opportunity.job) === jobKey,
+    );
+    if (linkedOpportunity) {
+      updateOpportunity(linkedOpportunity.id, (opportunity) => ({
+        ...opportunity,
+        applicationId: application.id,
+        resumeId: previewResume.id,
+        updatedAt: now,
+      }));
+    } else {
+      const created = createManualOpportunity({
+        company: application.job.company,
+        title: application.job.title,
+        description: application.job.description,
+        stage: "saved",
+        applicationId: application.id,
+        resumeId: previewResume.id,
+        channel: application.channel,
+      }, { now });
+      setOpportunities((current) => [{ ...created, source: "workspace" }, ...current]);
+    }
+    setMessage("已保存为投递记录并同步到机会漏斗，后续可在跟进页补充渠道和下一步。");
   }
 
   function generateCustomizedResumeFromPreview() {
@@ -905,6 +1069,7 @@ export default function App() {
     }
 
     const now = new Date().toISOString();
+    const removedApplicationIds = new Set(applications.filter((application) => application.resumeId === id).map((application) => application.id));
     setResumes((current) =>
       current
         .filter((resume) => resume.id !== id)
@@ -913,6 +1078,12 @@ export default function App() {
         ),
     );
     setApplications((current) => current.filter((application) => application.resumeId !== id));
+    setOpportunities((current) => current.map((opportunity) => ({
+      ...opportunity,
+      applicationId: opportunity.applicationId && removedApplicationIds.has(opportunity.applicationId) ? undefined : opportunity.applicationId,
+      resumeId: opportunity.resumeId === id ? undefined : opportunity.resumeId,
+      updatedAt: now,
+    })));
     setMessage(childResumeCount ? "简历版本已删除，基于它生成的定制版简历已保留为独立版本。" : "简历版本已删除。");
   }
 
@@ -925,7 +1096,11 @@ export default function App() {
     if (!ok) {
       return;
     }
+    const now = new Date().toISOString();
     setApplications((current) => current.filter((application) => application.id !== id));
+    setOpportunities((current) => current.map((opportunity) =>
+      opportunity.applicationId === id ? { ...opportunity, applicationId: undefined, updatedAt: now } : opportunity,
+    ));
     setMessage("投递记录已删除。");
   }
 
@@ -938,22 +1113,62 @@ export default function App() {
   }
 
   function updateApplicationStatus(id: string, status: ApplicationStatus) {
+    const now = new Date().toISOString();
     setApplications((current) =>
       current.map((application) =>
-        application.id === id ? { ...application, status, updatedAt: new Date().toISOString() } : application,
+        application.id === id ? { ...application, status, updatedAt: now } : application,
       ),
     );
+    const stageByStatus: Record<ApplicationStatus, OpportunityStage> = {
+      saved: "saved",
+      applied: "applied",
+      screening: "communicating",
+      interviewing: "interviewing",
+      offer: "offer",
+      rejected: "closed",
+    };
+    setOpportunities((current) => current.map((opportunity) =>
+      opportunity.applicationId === id
+        ? {
+            ...opportunity,
+            stage: stageByStatus[status],
+            stageChangedAt: now,
+            updatedAt: now,
+            nextAction: createDefaultNextAction(stageByStatus[status], opportunity.nextAction?.dueAt ?? "", now),
+          }
+        : opportunity,
+    ));
   }
 
   function updateApplicationDetails(
     id: string,
     patch: Partial<Pick<ApplicationRecord, "appliedAt" | "channel" | "hrContact" | "followUpAt" | "interviewAt" | "notes">>,
   ) {
+    const now = new Date().toISOString();
+    const currentApplication = applications.find((application) => application.id === id);
     setApplications((current) =>
       current.map((application) =>
-        application.id === id ? { ...application, ...patch, updatedAt: new Date().toISOString() } : application,
+        application.id === id
+          ? { ...application, ...patch, status: patch.interviewAt ? "interviewing" : application.status, updatedAt: now }
+          : application,
       ),
     );
+    if (!currentApplication) return;
+    setOpportunities((current) => current.map((opportunity) =>
+      opportunity.applicationId === id
+        ? {
+            ...opportunity,
+            channel: patch.channel ?? opportunity.channel,
+            contact: patch.hrContact ?? opportunity.contact,
+            notes: patch.notes ?? opportunity.notes,
+            updatedAt: now,
+            ...(patch.interviewAt ? {
+              stage: opportunity.stage === "offer" ? opportunity.stage : "interviewing" as const,
+              nextAction: createDefaultNextAction("interviewing", opportunity.nextAction?.dueAt ?? "", now),
+            } : {}),
+          }
+        : opportunity,
+    ));
   }
 
   async function copyResume(resume: ResumeVersion) {
@@ -992,49 +1207,6 @@ export default function App() {
     }
   }
 
-  function exportDataBackup() {
-    const payload = createStoredPayload(profile, resumes, applications);
-    const blob = new Blob([JSON.stringify(payload, null, 2)], {
-      type: "application/json;charset=utf-8",
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `zhiqi-yunfan-backup-${new Date().toISOString().slice(0, 10)}.json`;
-    link.click();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-    setMessage("已导出本地数据备份 JSON。换浏览器或换电脑时，可用它恢复经历库、简历版本和投递记录。");
-  }
-
-  async function importDataBackup(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) {
-      return;
-    }
-
-    const ok = window.confirm("导入备份会覆盖当前浏览器里的经历库、简历版本和投递记录。确定继续吗？");
-    if (!ok) {
-      return;
-    }
-
-    try {
-      const parsed = JSON.parse(await file.text()) as unknown;
-      if (!looksLikeStoredPayload(parsed)) {
-        throw new Error("Invalid backup shape");
-      }
-      const restored = normalizeStoredState(parsed);
-      setProfile(restored.profile);
-      setResumes(restored.resumes);
-      setApplications(restored.applications);
-      setSelectedResumeId(restored.resumes[0]?.id ?? "");
-      navigateTo("workspace");
-      setMessage("已导入数据备份，并完成结构校验。");
-    } catch {
-      setMessage("导入失败：请选择有效的职启云帆 JSON 备份文件。", "error");
-    }
-  }
-
   function clearLocalData() {
     const ok = window.confirm("确定清空简历、经历库和投递记录吗？API 配置与 BOSS 职位池会保留。");
     if (!ok) {
@@ -1049,23 +1221,25 @@ export default function App() {
     setProfile(DEFAULT_PROFILE);
     setResumes([]);
     setApplications([]);
+    setOpportunities([]);
+    setJobPool({ savedViews: [] });
     clearWorkspaceSyncMeta();
     setSelectedResumeId("");
     setJobDraft(EMPTY_JOB);
     setPasteTitle("我的已有简历");
     setPasteText("");
     navigateTo("workspace");
-    setMessage("已清空简历、经历库和投递记录；服务器将同步这次更改。");
+    setMessage("已清空简历、经历库、投递记录和机会漏斗；服务器将同步这次更改。");
   }
 
   const pageCopy: Record<TabId, { title: string; description: string }> = {
-    workspace: { title: "让好经历，有个好开场。", description: "这里是你的求职成长工作台。把经历、简历和每一次机会慢慢整理好。" },
-    integration: { title: "把 BOSS 里的机会，带回自己的桌面。", description: "安装扩展、配置个人 API，再把当前页面可见的职位带入本机匹配和跟进流程。" },
+    workspace: { title: "今日驾驶舱", description: "先处理时间敏感的动作，再让机会、材料和面试准备稳步推进。" },
+    integration: { title: "机会中心", description: "把发现、判断、材料、跟进和面试放在同一条清晰路径里。" },
     agent: { title: "把目标岗位，看得更清楚。", description: "从岗位要求到真实经历，找到值得表达的优势和下一步准备方向。" },
     profile: { title: "先把做过的事，写下来。", description: "课程项目、实习和个人作品，都是你自己的素材。" },
     builder: { title: "一份简历，一个合适的版本。", description: "专心编辑，随时预览。把最能说明你的经历放在前面。" },
     optimizer: { title: "给这次投递，多一点针对性。", description: "用本地规则核对关键词，再用自己的事实判断取舍。" },
-    applications: { title: "每一个机会，都有后续。", description: "记录投递、准备面试，也为下一次沟通留好线索。" },
+    applications: { title: "跟进", description: "记录下一步、完成或改期跟进，再从面试任务打开准备包。" },
     templates: { title: "选个版式，找到表达的起点。", description: "简历版式与岗位内容框架可以分别选择，真实经历始终由你填写。" },
   };
 
@@ -1079,6 +1253,221 @@ export default function App() {
     }
     navigateTo("builder");
     setMessage("已应用简历版式，经历内容保持原样。");
+  }
+
+  function updateOpportunity(
+    opportunityId: string,
+    updater: (opportunity: OpportunityRecord) => OpportunityRecord,
+  ) {
+    const now = new Date().toISOString();
+    setOpportunities((current) => current.map((opportunity) =>
+      opportunity.id === opportunityId ? updater({ ...opportunity, updatedAt: now }) : opportunity,
+    ));
+  }
+
+  function advanceOpportunity(opportunityId: string, nextStage: OpportunityStage) {
+    const now = new Date().toISOString();
+    updateOpportunity(opportunityId, (opportunity) => ({
+      ...opportunity,
+      stage: nextStage,
+      stageChangedAt: now,
+      nextAction: createDefaultNextAction(nextStage, opportunity.nextAction?.dueAt ?? "", now),
+      updatedAt: now,
+    }));
+    const nextStatus = APPLICATION_STATUS_BY_OPPORTUNITY_STAGE[nextStage];
+    if (nextStatus) {
+      setApplications((current) => current.map((application) =>
+        application.id === opportunities.find((opportunity) => opportunity.id === opportunityId)?.applicationId
+          ? { ...application, status: nextStatus, updatedAt: now }
+          : application,
+      ));
+    }
+    setMessage(`机会已推进至“${OPPORTUNITY_STAGE_LABELS[nextStage]}”。`);
+  }
+
+  function markOpportunityUnsuitable(opportunityId: string) {
+    const now = new Date().toISOString();
+    updateOpportunity(opportunityId, (opportunity) => ({
+      ...opportunity,
+      stage: "unsuitable",
+      stageChangedAt: now,
+      nextAction: undefined,
+    }));
+    const linkedApplicationId = opportunities.find((opportunity) => opportunity.id === opportunityId)?.applicationId;
+    if (linkedApplicationId) {
+      setApplications((current) => current.map((application) =>
+        application.id === linkedApplicationId ? { ...application, status: "rejected", updatedAt: now } : application,
+      ));
+    }
+    setMessage("机会已标记为不适合，BOSS 原始职位不会被修改。", "warning");
+  }
+
+  function undoOpportunityExit(opportunityId: string) {
+    const now = new Date().toISOString();
+    updateOpportunity(opportunityId, (opportunity) => ({
+      ...opportunity,
+      stage: "new",
+      stageChangedAt: now,
+      nextAction: createDefaultNextAction("new", "", now),
+    }));
+    const linkedApplicationId = opportunities.find((opportunity) => opportunity.id === opportunityId)?.applicationId;
+    if (linkedApplicationId) {
+      setApplications((current) => current.map((application) =>
+        application.id === linkedApplicationId ? { ...application, status: "saved", updatedAt: now } : application,
+      ));
+    }
+    setMessage("已将机会恢复到待筛选。");
+  }
+
+  function completeOpportunityAction(opportunityId: string, actionId: string) {
+    const completedAt = new Date().toISOString();
+    updateOpportunity(opportunityId, (opportunity) => ({
+      ...opportunity,
+      nextAction: opportunity.nextAction?.id === actionId
+        ? { ...opportunity.nextAction, completedAt }
+        : opportunity.nextAction,
+    }));
+    setMessage("下一步已完成，今日驾驶舱已同步更新。");
+  }
+
+  function rescheduleOpportunityAction(opportunityId: string, dueAt: string) {
+    const parsed = new Date(dueAt);
+    const normalizedDueAt = Number.isNaN(parsed.getTime()) ? dueAt : parsed.toISOString();
+    updateOpportunity(opportunityId, (opportunity) => ({
+      ...opportunity,
+      nextAction: opportunity.nextAction
+        ? { ...opportunity.nextAction, dueAt: normalizedDueAt, completedAt: undefined }
+        : createDefaultNextAction(opportunity.stage, normalizedDueAt),
+    }));
+    setMessage("下一步已改期。");
+  }
+
+  function saveOpportunityView(view: Omit<SavedJobView, "id">) {
+    if (jobPool.savedViews.length >= 5) {
+      setMessage("筛选视图最多保存 5 个，请先删除一个旧视图。", "warning");
+      return;
+    }
+    const id = createId("view");
+    setJobPool((current) => ({ savedViews: [...current.savedViews, { ...view, id }].slice(0, 5) }));
+    setMessage(`已保存筛选视图“${view.name}”。`);
+  }
+
+  function deleteOpportunityView(viewId: string) {
+    setJobPool((current) => ({ savedViews: current.savedViews.filter((view) => view.id !== viewId) }));
+    setMessage("筛选视图已删除。");
+  }
+
+  function confirmOpportunityImport(kind: "paste" | "csv", rawText: string) {
+    let imported: OpportunityRecord[] = [];
+    if (kind === "csv") {
+      const preview = parseOpportunityCsv(rawText, { existingOpportunities: opportunities });
+      if (!preview.canImport) {
+        setMessage(preview.globalErrors[0]?.message || "CSV 仍有无效应行，请修正后再导入。", "warning");
+        return;
+      }
+      imported = preview.records;
+    } else {
+      imported = rawText
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .flatMap((line) => {
+          const [company = "", title = "", location = "", description = ""] = line.split(/\t|,|;|\||｜/).map((cell) => cell.trim());
+          if (!company || !title) return [];
+          return [createManualOpportunity({ company, title, description, location, stage: "new" })];
+        });
+    }
+    if (!imported.length) {
+      setMessage("没有可导入的有效机会。", "warning");
+      return;
+    }
+    const seen = new Set(opportunities.map((opportunity) => [
+      opportunity.job.company.trim().toLowerCase(),
+      opportunity.job.title.trim().toLowerCase(),
+      opportunity.sourceUrl ?? "",
+    ].join("::")));
+    const additions = imported.filter((opportunity) => {
+      const key = [
+        opportunity.job.company.trim().toLowerCase(),
+        opportunity.job.title.trim().toLowerCase(),
+        opportunity.sourceUrl ?? "",
+      ].join("::");
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    setOpportunities((current) => [...additions, ...current]);
+    setMessage(`已导入 ${additions.length} 条机会；${imported.length - additions.length} 条重复记录不会覆盖现有状态。`);
+  }
+
+  function addBossJobToFunnel(job: BossJobRecord) {
+    const existing = opportunities.find((opportunity) =>
+      opportunity.sourceJobId === job.source_job_id ||
+      (opportunity.sourceUrl && opportunity.sourceUrl === job.source_url),
+    );
+    if (existing) {
+      setInterviewOpportunityId("");
+      setIntegrationSection("funnel");
+      navigateTo("integration");
+      setMessage("该 BOSS 职位已在机会漏斗中，已保留现有状态。", "warning");
+      return;
+    }
+    const created = createManualOpportunity({
+      company: job.company,
+      title: job.title,
+      description: job.description || `${job.company} ${job.title}`,
+      location: job.location,
+      salary: job.salary,
+      url: job.source_url,
+      stage: "new",
+      channel: "BOSS",
+      notes: [job.experience, job.education, ...job.tags].filter(Boolean).join(" · "),
+    });
+    const opportunity: OpportunityRecord = {
+      ...created,
+      id: `opp-boss-${job.id}`,
+      source: "boss",
+      sourceJobId: job.source_job_id,
+      sourceUrl: job.source_url,
+    };
+    setOpportunities((current) => [opportunity, ...current]);
+    setIntegrationSection("funnel");
+    setMessage(`已将“${job.company} · ${job.title}”加入机会漏斗；没有触发投递或沟通。`);
+  }
+
+  function openInterviewPackage(opportunityId: string) {
+    setInterviewOpportunityId(opportunityId);
+    navigateTo("agent");
+  }
+
+  function openOpportunity(opportunityId: string) {
+    setInterviewOpportunityId("");
+    setIntegrationSection("funnel");
+    navigateTo("integration");
+    window.setTimeout(() => document.getElementById(`opportunity-${opportunityId}-title`)?.scrollIntoView({ block: "center" }), 0);
+  }
+
+  function openIntegrationSection(section: IntegrationSection) {
+    setInterviewOpportunityId("");
+    setIntegrationSection(section);
+    setMobilePanel(null);
+    navigateTo("integration");
+  }
+
+  function analyzeOpportunity(opportunity: OpportunityCenterRecord) {
+    setJobDraft({
+      company: opportunity.job.company,
+      title: opportunity.job.title,
+      description: opportunity.job.description,
+    });
+    setMatchPreview(undefined);
+    if (!resumes.length) {
+      navigateTo("profile");
+      setMessage("已带入机会 JD。请先完善经历库并生成一份基础简历。", "warning");
+      return;
+    }
+    navigateTo("optimizer");
+    setMessage(`已带入“${opportunity.job.company} · ${opportunity.job.title}”的 JD。`);
   }
 
   function useBossJobForMatching(job: BossJobRecord) {
@@ -1099,6 +1488,7 @@ export default function App() {
   function navigateTo(tab: TabId) {
     setActiveTab(tab);
     setNavExpanded(false);
+    setMobilePanel(null);
     document.getElementById("main-content")?.focus({ preventScroll: true });
   }
 
@@ -1132,31 +1522,70 @@ export default function App() {
           {navExpanded ? <X size={20} /> : <Menu size={20} />}<span>导航</span>
         </button>
         </div>
-        <nav id="primary-navigation" className={`nav-list ${navExpanded ? "nav-list--expanded" : ""}`} aria-label="主导航" onKeyDown={(event) => { if (event.key === "Escape") { setNavExpanded(false); document.querySelector<HTMLButtonElement>(".nav-toggle")?.focus(); } }}>
-          <NavButton active={activeTab === "workspace"} icon={<LayoutDashboard size={18} />} onClick={() => navigateTo("workspace")}>
-            工作台
-          </NavButton>
-          <NavButton active={activeTab === "integration"} icon={<Cable size={18} />} onClick={() => navigateTo("integration")}>
-            BOSS 接入
-          </NavButton>
-          <NavButton active={activeTab === "agent"} icon={<ScanSearch size={18} />} onClick={() => navigateTo("agent")}>
-            岗位分析与准备
-          </NavButton>
-          <NavButton active={activeTab === "profile"} icon={<Library size={18} />} onClick={() => navigateTo("profile")}>
-            经历库
-          </NavButton>
-          <NavButton active={activeTab === "builder"} icon={<FileText size={18} />} onClick={() => navigateTo("builder")}>
-            简历版本
-          </NavButton>
-          <NavButton active={activeTab === "templates"} icon={<Shapes size={18} />} onClick={() => navigateTo("templates")}>
-            模板与提纲
-          </NavButton>
-          <NavButton active={activeTab === "optimizer"} icon={<Search size={18} />} onClick={() => navigateTo("optimizer")}>
-            JD 匹配（本地规则）
-          </NavButton>
-          <NavButton active={activeTab === "applications"} icon={<BriefcaseBusiness size={18} />} onClick={() => navigateTo("applications")}>
-            投递管理
-          </NavButton>
+        <nav
+          id="primary-navigation"
+          className={`nav-list ${navExpanded ? "nav-list--expanded" : ""}`}
+          aria-label="主导航"
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              setNavExpanded(false);
+              setMobilePanel(null);
+              document.querySelector<HTMLButtonElement>(".nav-toggle")?.focus();
+            }
+          }}
+        >
+          <div className="desktop-nav-groups">
+            <section className="nav-group" aria-label="今日">
+              <span className="nav-group__label">今日</span>
+              <NavButton active={activeTab === "workspace"} icon={<CalendarDays size={18} />} onClick={() => navigateTo("workspace")}>今日</NavButton>
+            </section>
+            <section className="nav-group" aria-label="机会">
+              <span className="nav-group__label">机会</span>
+              <NavButton active={activeTab === "integration"} icon={<Target size={18} />} onClick={() => openIntegrationSection("funnel")}>机会中心</NavButton>
+              <NavButton active={activeTab === "applications"} icon={<BriefcaseBusiness size={18} />} onClick={() => navigateTo("applications")}>跟进</NavButton>
+            </section>
+            <section className="nav-group" aria-label="材料">
+              <span className="nav-group__label">材料</span>
+              <NavButton active={activeTab === "profile"} icon={<Library size={18} />} onClick={() => navigateTo("profile")}>经历库</NavButton>
+              <NavButton active={activeTab === "builder"} icon={<FileText size={18} />} onClick={() => navigateTo("builder")}>简历版本</NavButton>
+              <NavButton active={activeTab === "templates"} icon={<Shapes size={18} />} onClick={() => navigateTo("templates")}>模板与提纲</NavButton>
+              <NavButton active={activeTab === "optimizer"} icon={<Search size={18} />} onClick={() => navigateTo("optimizer")}>JD 匹配</NavButton>
+            </section>
+            <section className="nav-group" aria-label="准备">
+              <span className="nav-group__label">准备</span>
+              <NavButton active={activeTab === "agent"} icon={<ScanSearch size={18} />} onClick={() => navigateTo("agent")}>岗位分析与准备</NavButton>
+            </section>
+          </div>
+
+          <div className="mobile-nav-shortcuts">
+            <NavButton active={activeTab === "workspace"} icon={<CalendarDays size={18} />} onClick={() => navigateTo("workspace")}>今日</NavButton>
+            <NavButton active={activeTab === "integration"} icon={<Target size={18} />} onClick={() => openIntegrationSection("funnel")}>机会</NavButton>
+            <NavButton active={activeTab === "applications"} icon={<ListTodo size={18} />} onClick={() => navigateTo("applications")}>跟进</NavButton>
+            <button className={`nav-button mobile-nav-disclosure ${activeTab === "profile" || activeTab === "builder" || activeTab === "templates" || activeTab === "optimizer" ? "nav-button--active" : ""}`} type="button" aria-expanded={mobilePanel === "materials"} onClick={() => setMobilePanel((current) => current === "materials" ? null : "materials")}>
+              <FileText size={18} /><span>材料</span><ChevronDown size={16} aria-hidden="true" />
+            </button>
+            <button className="nav-button mobile-nav-disclosure" type="button" aria-expanded={mobilePanel === "more"} onClick={() => setMobilePanel((current) => current === "more" ? null : "more")}>
+              <MoreHorizontal size={18} /><span>更多任务</span><ChevronDown size={16} aria-hidden="true" />
+            </button>
+
+            {mobilePanel === "materials" ? (
+              <div className="mobile-task-panel" aria-label="材料任务">
+                <strong>材料工作区</strong>
+                <button type="button" onClick={() => navigateTo("profile")}>经历库</button>
+                <button type="button" onClick={() => navigateTo("builder")}>简历版本 · 默认</button>
+                <button type="button" onClick={() => navigateTo("templates")}>模板与提纲</button>
+                <button type="button" onClick={() => navigateTo("optimizer")}>JD 匹配</button>
+              </div>
+            ) : null}
+            {mobilePanel === "more" ? (
+              <div className="mobile-task-panel" aria-label="更多任务">
+                <strong>更多任务</strong>
+                <button type="button" onClick={() => navigateTo("agent")}>岗位分析</button>
+                <button type="button" onClick={() => openIntegrationSection("settings")}>API 配置</button>
+                <button type="button" onClick={() => document.querySelector<HTMLElement>(".data-settings > summary")?.click()}>数据设置</button>
+              </div>
+            ) : null}
+          </div>
         </nav>
       </header>
 
@@ -1173,6 +1602,10 @@ export default function App() {
                 数据设置
               </summary>
               <div className="data-settings__menu">
+                <button className="ghost-button" type="button" onClick={() => openIntegrationSection("settings")}>
+                  <Settings size={17} />
+                  API 接入配置
+                </button>
                 <p className="data-settings__help">简历与投递会同步到本机 Docker 中的 SQLite；API Key 只保存在当前浏览器。当前状态：{workspaceConflict ? "服务器有更新，本地修改已保留" : workspaceSync === "saved" ? "服务器已同步" : workspaceSync === "error" ? "服务器暂不可用，已保存本地副本" : "正在连接服务器"}。</p>
                 {workspaceConflict ? (
                   <div className="workspace-conflict" role="alert">
@@ -1184,15 +1617,7 @@ export default function App() {
                     </div>
                   </div>
                 ) : null}
-                <button className="ghost-button" type="button" onClick={exportDataBackup}>
-                  <Download size={17} />
-                  导出数据备份
-                </button>
-                <label className="ghost-button file-button">
-                  <Upload size={17} />
-                  导入数据备份
-                  <input type="file" accept="application/json,.json" onChange={importDataBackup} />
-                </label>
+                <p className="data-settings__help">数据导入和导出已放到对应页面：简历页上传/导出简历，机会页导入/导出机会，跟进页导出投递记录。</p>
                 <div className="danger-zone">
                   <strong>危险操作</strong>
                   <button className="destructive-button" type="button" onClick={clearLocalData}>
@@ -1209,9 +1634,26 @@ export default function App() {
 
         {activeTab === "integration" ? (
           <IntegrationCenter
+            section={integrationSection}
             selectedResume={selectedResume}
+            onSectionChange={setIntegrationSection}
             onGo={navigateTo}
             onUseJob={useBossJobForMatching}
+            onAddJobToFunnel={addBossJobToFunnel}
+            opportunities={opportunityCenterRecords}
+            savedViews={jobPool.savedViews}
+            onDeleteSavedView={deleteOpportunityView}
+            opportunityHandlers={{
+              onAdvance: advanceOpportunity,
+              onMarkUnsuitable: markOpportunityUnsuitable,
+              onUndo: undoOpportunityExit,
+              onScheduleFollowUp: rescheduleOpportunityAction,
+              onCompleteFollowUp: completeOpportunityAction,
+              onConfirmImport: confirmOpportunityImport,
+              onOpenInterviewPackage: openInterviewPackage,
+              onAnalyze: analyzeOpportunity,
+              onSaveView: saveOpportunityView,
+            }}
           />
         ) : null}
 
@@ -1227,16 +1669,80 @@ export default function App() {
             onGo={navigateTo}
             onLoadSampleUser={loadSampleUser}
             onRunDemoFlow={runDemoFlow}
+            todayTasks={todayTasks}
+            todayInterviews={todayInterviews}
+            todayOpportunities={todayOpportunities}
+            onCompleteTodayTask={(taskId) => {
+              const [opportunityId, actionId] = taskId.split("::");
+              if (opportunityId && actionId) completeOpportunityAction(opportunityId, actionId);
+            }}
+            onOpenTodayTask={(task) => {
+              if (!task.opportunityId) return;
+              if (task.kind === "interview") openInterviewPackage(task.opportunityId);
+              else openOpportunity(task.opportunityId);
+            }}
+            onOpenOpportunity={openOpportunity}
+            onOpenInterviewPackage={openInterviewPackage}
           />
         ) : null}
 
         {activeTab === "agent" ? (
-          <AgentWorkspace
-            profile={profile}
-            resumes={resumes}
-            selectedResumeId={selectedResumeId}
-            onSelectResume={setSelectedResumeId}
-          />
+          currentInterviewOpportunity && currentInterviewPackage ? (
+            <div className="stack interview-package-view">
+              <div className="interview-package-view__bar">
+                <button className="ghost-button" type="button" onClick={() => openOpportunity(currentInterviewOpportunity.id)}>
+                  <ChevronDown size={17} />返回机会
+                </button>
+                <span>从机会记录生成的规则面试包</span>
+              </div>
+              <InterviewPackage
+                opportunityId={currentInterviewOpportunity.id}
+                job={{
+                  company: currentInterviewOpportunity.job.company,
+                  title: currentInterviewOpportunity.job.title,
+                  description: currentInterviewOpportunity.job.description,
+                  location: currentInterviewOpportunity.job.location,
+                  interviewAt: currentInterviewApplication?.interviewAt,
+                  format: "video",
+                }}
+                resume={currentInterviewResume ?? null}
+                match={currentInterviewApplication ? {
+                  score: currentInterviewApplication.report.score,
+                  strengths: currentInterviewApplication.report.strengths,
+                  gaps: currentInterviewApplication.report.gaps,
+                } : undefined}
+                rules={[
+                  ...currentInterviewPackage.projectStories.map((summary, index) => ({
+                    id: `story-${index}`,
+                    title: `证据故事 ${index + 1}`,
+                    summary,
+                    basis: "rule" as const,
+                  })),
+                  ...currentInterviewPackage.riskReminders.map((summary, index) => ({
+                    id: `risk-${index}`,
+                    title: "表达边界",
+                    summary,
+                    basis: "rule" as const,
+                  })),
+                ]}
+                questions={currentInterviewPackage.likelyQuestions}
+                checklist={currentInterviewPackage.preparationChecklist.map((title, index) => ({
+                  id: `check-${index}`,
+                  title,
+                  completed: false,
+                }))}
+                onNavigate={navigateTo}
+                onOpenResume={() => navigateTo("builder")}
+              />
+            </div>
+          ) : (
+            <AgentWorkspace
+              profile={profile}
+              resumes={resumes}
+              selectedResumeId={selectedResumeId}
+              onSelectResume={setSelectedResumeId}
+            />
+          )
         ) : null}
 
         {activeTab === "profile" ? (
@@ -1300,10 +1806,14 @@ export default function App() {
           <ApplicationsView
             applications={applications}
             resumes={resumes}
+            opportunities={opportunities}
             onDelete={deleteApplication}
             onDetailsChange={updateApplicationDetails}
             onRecalculate={recalculateApplication}
             onStatusChange={updateApplicationStatus}
+            onCompleteNextAction={completeOpportunityAction}
+            onRescheduleNextAction={rescheduleOpportunityAction}
+            onOpenInterviewPackage={openInterviewPackage}
           />
         ) : null}
       </main>

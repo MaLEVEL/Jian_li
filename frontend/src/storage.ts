@@ -1,13 +1,18 @@
 import { DEFAULT_PROFILE, RESUME_TEMPLATE_OPTIONS, STATUS_OPTIONS } from "./constants";
 import { createId, renderResumeText, splitLines, splitSkills } from "./resumeLogic";
+import { createManualOpportunity, normalizeOpportunityRecord } from "./opportunityPipeline";
 import { getResumeAppearanceDefaults, getResumeTemplateDefinition } from "./templateCatalog";
 import type {
   ApplicationRecord,
   CandidateProfile,
   InterviewQuestions,
   JobDraft,
+  ApplicationStatus,
   MatchReport,
+  OpportunityRecord,
+  OpportunityStage,
   ResumeAppearance,
+  SavedJobView,
   ResumeIdentity,
   ResumeSections,
   ResumeTemplate,
@@ -17,10 +22,16 @@ import type {
 export const STORAGE_KEY = "jobfit-ai-web-mvp";
 export const STORAGE_VERSION = 1;
 
+export interface StoredJobPool {
+  savedViews: SavedJobView[];
+}
+
 export interface StoredState {
   profile: CandidateProfile;
   resumes: ResumeVersion[];
   applications: ApplicationRecord[];
+  opportunities: OpportunityRecord[];
+  jobPool: StoredJobPool;
 }
 
 export interface StoredPayload extends StoredState {
@@ -33,7 +44,41 @@ export function createInitialState(): StoredState {
     profile: { ...DEFAULT_PROFILE },
     resumes: [],
     applications: [],
+    opportunities: [],
+    jobPool: { savedViews: [] },
   };
+}
+export function createLegacyOpportunities(applications: ApplicationRecord[]): OpportunityRecord[] {
+  const stageByStatus: Record<ApplicationStatus, OpportunityStage> = {
+    saved: "saved",
+    applied: "applied",
+    screening: "communicating",
+    interviewing: "interviewing",
+    offer: "offer",
+    rejected: "closed",
+  };
+  return applications.map((application) => {
+    const created = createManualOpportunity({
+      company: application.job.company,
+      title: application.job.title,
+      description: application.job.description,
+      stage: stageByStatus[application.status],
+      nextActionAt: application.followUpAt,
+      applicationId: application.id,
+      resumeId: application.resumeId,
+      channel: application.channel,
+      contact: application.hrContact,
+      notes: application.notes,
+    }, { now: application.createdAt });
+    return {
+      ...created,
+      id: `opportunity-legacy-${application.id}`,
+      source: "workspace" as const,
+      createdAt: application.createdAt,
+      updatedAt: application.updatedAt,
+      stageChangedAt: application.createdAt,
+    };
+  });
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -233,6 +278,41 @@ function coerceQuestions(value: unknown): InterviewQuestions {
   };
 }
 
+function coerceSavedJobViews(value: unknown): SavedJobView[] {
+  const rawViews = isRecord(value) && Array.isArray(value.savedViews)
+    ? value.savedViews
+    : Array.isArray(value)
+      ? value
+      : [];
+  const seen = new Set<string>();
+  const stages = new Set(["new", "saved", "tailoring", "applied", "communicating", "interviewing", "offer", "unsuitable", "closed"]);
+  const sources = new Set(["workspace", "boss", "manual", "csv"]);
+  return rawViews.flatMap((item) => {
+    if (!isRecord(item)) return [];
+    const name = coerceString(item.name).trim();
+    const id = coerceString(item.id).trim() || (name ? `view-${name}` : "");
+    if (!id || !name || seen.has(id)) return [];
+    seen.add(id);
+    const query = coerceString(item.query).trim();
+    const stageValues = Array.isArray(item.stages)
+      ? item.stages.map((stage) => coerceString(stage)).filter((stage) => stages.has(stage))
+      : [];
+    const sourceValue = coerceString(item.source);
+    const source = sources.has(sourceValue) ? sourceValue : "";
+    return [{
+      id,
+      name,
+      ...(query ? { query } : {}),
+      ...(stageValues.length ? { stages: stageValues as SavedJobView["stages"] } : {}),
+      ...(source ? { source: source as SavedJobView["source"] } : {}),
+    }];
+  }).slice(0, 5);
+}
+
+function coerceJobPool(value: unknown): StoredJobPool {
+  return { savedViews: coerceSavedJobViews(value) };
+}
+
 function coerceApplication(value: unknown): ApplicationRecord | null {
   if (!isRecord(value)) {
     return null;
@@ -285,8 +365,14 @@ export function normalizeStoredState(value: unknown): StoredState {
           resumeTitle: resumeById.get(application.resumeId)?.title ?? application.resumeTitle,
         }))
     : [];
+  const opportunities = Array.isArray(value.opportunities)
+    ? value.opportunities
+        .map((opportunity) => normalizeOpportunityRecord(opportunity))
+        .filter((opportunity): opportunity is OpportunityRecord => Boolean(opportunity))
+    : createLegacyOpportunities(applications);
 
-  return { profile, resumes, applications };
+  const jobPool = coerceJobPool(value.jobPool);
+  return { profile, resumes, applications, opportunities, jobPool };
 }
 
 export function looksLikeStoredPayload(value: unknown) {
@@ -303,6 +389,8 @@ export function createStoredPayload(
   profile: CandidateProfile,
   resumes: ResumeVersion[],
   applications: ApplicationRecord[],
+  opportunities: OpportunityRecord[] = [],
+  jobPool: StoredJobPool = { savedViews: [] },
 ): StoredPayload {
   return {
     version: STORAGE_VERSION,
@@ -310,6 +398,8 @@ export function createStoredPayload(
     profile,
     resumes,
     applications,
+    opportunities,
+    jobPool: coerceJobPool(jobPool),
   };
 }
 

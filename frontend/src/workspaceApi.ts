@@ -1,5 +1,16 @@
 import { resolveBossApiBaseUrl } from "./bossIntegration";
-import type { ApplicationRecord, CandidateProfile, ResumeVersion } from "./types";
+import type {
+  ApplicationRecord,
+  CandidateProfile,
+  OpportunityRecord,
+  ResumeVersion,
+  SavedJobView,
+} from "./types";
+
+
+export interface WorkspaceJobPool {
+  savedViews: SavedJobView[];
+}
 
 export interface WorkspaceStatePayload {
   version: number;
@@ -7,6 +18,8 @@ export interface WorkspaceStatePayload {
   profile: CandidateProfile;
   resumes: ResumeVersion[];
   applications: ApplicationRecord[];
+  opportunities: OpportunityRecord[];
+  jobPool: WorkspaceJobPool;
 }
 
 export const WORKSPACE_SYNC_KEY = "jobfit-workspace-sync-v1";
