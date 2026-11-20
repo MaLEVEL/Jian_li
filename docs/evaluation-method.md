@@ -1,101 +1,135 @@
-# Offline Evaluation Method
+# 离线评估方法
 
-## Purpose and ownership
+这份文档说明项目的离线评估能证明什么、不能证明什么。普通用户可先看“先看这里”，开发与验收人员再看后面的数据、指标和复现命令。
 
-This evaluation provides a reproducible regression check for the offline 职启云帆 pipeline without changing production code. It exercises the exact functions used by the application:
+## 先看这里
+
+- 评估用于检查解析、评分和检索是否发生回归，不是招聘实验。
+- 所有评分样本都是项目自行编写的合成数据，不代表真实候选人或真实招聘结果。
+- “技能覆盖率”只表示 JD 技能词与简历证据的覆盖程度，不是录用概率。
+- 默认评估只运行本地规则，不调用在线模型，不产生 Token 费用。
+- 结果和限制会写入 JSON 报告，不能用规划目标或示例数字替代实际输出。
+
+## 普通用户需要知道的结论
+
+本项目可以在本地复现“解析 JD/简历→加权技能评分→素材检索”的回归结果。它能帮助开发者确认代码改动没有破坏既有行为，但不能回答“这个工具能否提高录用率”。
+
+真实模型、BGE 和纯向量对比只有在实际运行后才能报告；未运行时应明确写“未测量”。
+
+---
+
+# 开发者文档
+
+## 目标与所有权
+
+评估用于对离线求职分析管线做可重复的回归检查，不修改生产数据。它直接调用应用实际使用的函数：
 
 - `app.nodes.parsers.local_job`
 - `app.nodes.parsers.local_resume`
 - `app.tools.scoring.score_match`
 - `app.rag.MaterialRetriever(mode=..., persist_directory=...).search`
 
-The fixtures and labels are project-authored synthetic data. They are not real candidates, real jobs, human real annotations, or manually reviewed production samples. The word “hand-authored” here means a deterministic project test expectation, not a claim about human annotation studies.
+fixtures 与标签均为项目作者编写的合成数据。“作者编写”这里只表示确定性测试预期，不代表人工标注研究。
 
-## Datasets
+## 数据集
 
-The score dataset contains 30 distinct JD/resume pairs:
+评分集包含 30 组不同的 JD/简历对：
 
-- 15 `strong_coverage` cases, covering Python backend, agent, RAG, data, ML, testing, and deployment stacks.
-- 15 `weak_or_nonmatching` cases, including partial Python coverage and unrelated Java, frontend, mobile, PM, operations, and non-technical stacks.
-- Every company name contains `Synthetic`, every case sets `synthetic: true`, and IDs and `(jd_text, resume_text)` pairs are unique.
-- Each case has a hand-authored expected score range. Ranges are deliberately narrower than 0–100 and constrain the expected quality band; they are not copied from the calculator output in the report.
-- Strong cases start at 70 or above. Weak/nonmatching cases end at 45 or below.
+- 15 组 `strong_coverage`，覆盖 Python 后端、Agent、RAG、数据、机器学习、测试和部署；
+- 15 组 `weak_or_nonmatching`，包括部分 Python 覆盖，以及无关的 Java、前端、移动端、产品、运营和非技术岗位；
+- 每个公司名包含 `Synthetic`，每个样本设置 `synthetic: true`，ID 与 `(jd_text, resume_text)` 组合唯一；
+- 每组有作者编写的期望分数范围，范围窄于 0–100，独立于计算器输出；
+- 强覆盖样本从 70 分起，弱匹配/不匹配样本不高于 45 分。
 
-Retrieval uses an independent set of eight synthetic material sets and queries. Each case has authored `relevant_ids`, and every relevant ID must exist in that case's material set. Retrieval labels are independent from score-case resumes and JDs.
+检索使用另一组 8 个合成素材集与查询。每组有作者编写的 `relevant_ids`，且每个相关 ID 必须存在于该组素材集合中。检索标签与评分样本的 JD/简历不共享。
 
-## Metrics
+## 指标
 
-### Score range accuracy
+### 分数范围准确率
 
-For every score case:
+对每个评分样本：
 
-1. Parse the JD with the production `local_job`.
-2. Parse the resume with the production `local_resume`.
-3. Call production `score_match(requirements, resume_skills, resume_text)`.
-4. Mark the case as passing when `expected_score_range.min <= actual_score <= expected_score_range.max`.
+1. 用生产代码 `local_job` 解析 JD；
+2. 用生产代码 `local_resume` 解析简历；
+3. 调用生产代码 `score_match(requirements, resume_skills, resume_text)`；
+4. 当 `expected_score_range.min <= actual_score <= expected_score_range.max` 时判定通过。
 
-Score accuracy is the number of in-range cases divided by 30. Accuracy is also reported by category. Case-level output includes actual score, expected range, matched skills, missing skills, and the production breakdown. A fixture exception is reported as a failed case rather than replacing the metric with a fabricated value.
+准确率为范围命中的样本数除以 30，并按类别分别报告。单条结果包括实际分数、期望范围、命中与缺失技能和评分明细。fixture 异常按失败样本处理，不伪造指标。
 
-### Alias versus exact baseline
+### 别名与精确匹配基线
 
-The alias check compares two spellings-only strategies:
+别名检查比较两种只处理拼写差异的策略：
 
-- Production path: run `score_match` with one requirement and one resume skill/text item.
-- Exact baseline: case-insensitive exact string equality, with no alias expansion.
+- 生产路径：调用 `score_match`，允许受控别名扩展；
+- 精确基线：仅做大小写不敏感的完整字符串相等，不展开别名。
 
-True aliases include `sklearn` → `scikit-learn`, `postgres` → `PostgreSQL`, `k8s` → `Kubernetes`, `torch` → `PyTorch`, and `reactjs` → `React`. The exact baseline should miss spelling variants that production recognizes.
-
-Distinct frameworks are tested as negative cases, including LangGraph versus LangChain, Java versus JavaScript, PyTorch versus TensorFlow, and FastAPI versus Django. Neither strategy may merge these related-but-different technologies.
-
-### Retrieval Recall@k
-
-The default evaluation instantiates the real local retriever and reports the mode exposed by `retriever.mode`, currently `local-hybrid`. For each retrieval case:
+应命中的别名包括：
 
 ```text
-recall@k = |returned IDs ∩ authored relevant_ids| / |authored relevant_ids|
+sklearn → scikit-learn
+postgres → PostgreSQL
+k8s → Kubernetes
+torch → PyTorch
+reactjs → React
 ```
 
-The summary reports the mean across retrieval cases.
+不应混同的技术包括：
 
-If current BM25 and local sparse-vector helper functions are accessible, the report also includes component-level BM25 and sparse-vector Recall@k for comparison with `local-hybrid`. If those helpers are unavailable or move without a callable replacement, comparison is disabled and the limitation says only the public hybrid result was measured. The evaluation does not create a simulated vector baseline.
+```text
+LangGraph ≠ LangChain
+Java ≠ JavaScript
+PyTorch ≠ TensorFlow
+FastAPI ≠ Django
+```
 
-`--rag-mode bge` uses the actual `MaterialRetriever(mode="bge")` path and its configured BGE/Chroma runtime. If optional dependencies or models are unavailable, the command fails clearly; it never substitutes local scores or fabricated BGE results.
+### 检索 Recall@k
 
-### Timing
+默认评估实例化真实本地检索器，并报告其 `retriever.mode`，当前默认是 `local-hybrid`：
 
-All reported durations are measured with `time.perf_counter()` around the real operations. Parser/scoring, alias, retrieval, and total durations are reported separately. Timing varies by machine and run and is not used as a quality gate.
+```text
+recall@k = |返回 ID ∩ 作者相关 ID| / |作者相关 ID|
+```
 
-## Command line
+报告所有检索样本的平均值。若 BM25 与本地稀疏向量辅助函数可调用，报告还会给出组件级 Recall@k 以比较 `local-hybrid`。辅助函数不可用或迁移时，比较项会关闭并记录限制；不会创建模拟向量基线。
 
-From `backend/`:
+`--rag-mode bge` 会运行实际 BGE/Chroma 路径。可选依赖或模型不可用时命令明确失败，绝不用本地分数替代 BGE 结果。
+
+### 耗时
+
+所有耗时由 `time.perf_counter()` 围绕真实操作测量，分别报告解析/评分、别名、检索和总耗时。耗时随机器与运行状态变化，不作为质量门槛。
+
+## 复现命令
+
+从 `backend/`：
 
 ```powershell
 ..\.venv\Scripts\python.exe -m eval.run_eval --output ..\docs\evaluation-report.json
 ```
 
-From the repository root with `backend` on `PYTHONPATH`:
+从仓库根目录：
 
 ```powershell
-$env:PYTHONPATH='backend'
-.venv\Scripts\python.exe -m eval.run_eval --output docs/evaluation-report.json
+$env:PYTHONPATH = 'backend'
+.venv\Scripts\python.exe -m eval.run_eval --output docs\evaluation-report.json
 ```
 
-The default command is report-only and exits zero after writing the report. An optional unit-interval gate may be used by CI:
+默认命令写报告后退出 0。需要 CI 门槛时可设置最低分数范围准确率：
 
 ```powershell
-.venv\Scripts\python.exe -m eval.run_eval --output docs/evaluation-report.json --min-score-accuracy 0.8
+$env:PYTHONPATH = 'backend'
+.venv\Scripts\python.exe -m eval.run_eval --output docs\evaluation-report.json --min-score-accuracy 0.8
 ```
 
-With the gate enabled, the CLI exits nonzero only when measured score-range accuracy is below the threshold. `--retrieval-top-k` controls the Recall cutoff, and `--rag-mode` selects `local` or actual `bge`.
+只有启用门槛时，实测准确率低于阈值才会返回非零。`--retrieval-top-k` 控制 Recall 截断，`--rag-mode` 选择 `local` 或真实 `bge`。
 
-The JSON report includes schema version, generation time, dataset provenance, score-case count, actual retrieval mode, metrics, case results, limitations, thresholds when supplied, and measured durations.
+JSON 报告包含 schema 版本、生成时间、数据集来源、评分样本数、实际检索模式、指标、逐样本结果、限制、门槛与实际耗时。
 
-## Limitations
+## 限制
 
-- All cases and labels are synthetic and deterministic; they do not estimate human agreement or hiring quality.
-- Scores measure weighted skill-string coverage and are not probability of hire.
-- The parser is lexical and has a limited negation filter; it does not provide general sentence-level semantic understanding. Synthetic evaluation fixtures avoid ambiguous negative claims, while focused parser tests cover selected negations.
-- Default evaluation is offline and reports no Token counts or costs.
-- Local mode does not run BGE and makes no BGE quality or latency claim.
-- A separate dense-vector baseline is not measured in local mode; sparse-vector comparison, when present, uses the local lexical sparse-vector helper actually exposed by the implementation.
-- Timings are local wall-clock observations, not controlled benchmarks.
+- 样本和标签是合成且确定性的，不能估计人工一致率或招聘质量。
+- 分数是加权技能字符串覆盖率，不是录用概率。
+- 解析器以词法规则为主，只有有限否定过滤，不具备通用句子语义理解。
+- 默认离线评估不报告 Token 或费用。
+- `local` 模式不运行 BGE，也不声称 BGE 质量或延迟。
+- 本地模式不测量独立 dense-vector 基线；稀疏向量比较只能使用实际存在的本地词法辅助实现。
+- 耗时是本地观察值，不是受控 benchmark。

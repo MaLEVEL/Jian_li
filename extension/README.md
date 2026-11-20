@@ -1,67 +1,126 @@
 # 职启云帆 BOSS 职位采集器
 
-这是一个 Manifest V3 扩展，用于在用户主动打开 BOSS 直聘页面后，采集“当前页面已经显示”的职位并发送到本机职启云帆服务。扩展只响应用户点击，不翻页、不滚动、不点击职位，也不会自动投递简历。
+这是一个可选的 Chrome/Edge Manifest V3 扩展。你在 BOSS 页面主动点击采集后，它只读取当前标签页中已经显示的职位，并把结果发送到你配置的职启云帆本机服务。
 
-## 加载扩展
+## 普通用户操作
 
-1. 启动本机职启云帆服务，默认地址为 `http://127.0.0.1:18001`。
+### 安装
+
+1. 先启动职启云帆，默认地址为 `http://127.0.0.1:18001`。
 2. Chrome 打开 `chrome://extensions`；Edge 打开 `edge://extensions`。
-3. 开启“开发者模式”。
-4. 选择“加载已解压的扩展程序”，选择本目录 `extension`。
-5. 建议把扩展固定到工具栏，方便查看按钮状态。
+3. 开启 **开发者模式**。这个开关只用于允许浏览器加载本地扩展，不需要编程。
+4. 点击 **加载已解压的扩展程序**，选择本目录 `extension`。
+5. 建议把“职启云帆 BOSS 职位采集器”固定到工具栏。
 
-修改扩展代码后，需要在扩展管理页点击“重新加载”。
+### 采集职位
 
-`manifest.json` 包含固定公钥，扩展 ID 稳定为 `jdacbgmhcbpkoccblehfahhoekjiiopl`。后端默认允许这个精确 Origin，因此移动扩展目录不需要重新配置 CORS。
-
-## 使用顺序
-
-1. 在 BOSS 直聘页面手动登录并打开职位搜索或职位详情。
-2. 等待职位卡片及右侧详情内容显示完成。
+1. 在 BOSS 直聘手动登录，打开职位搜索结果或职位详情。
+2. 等职位卡片、详情或描述加载完成。
 3. 点击扩展图标，确认或修改本机服务地址。
-4. 点击“测试连接”，确认 `/api/boss/health` 可访问。
-5. 点击“采集当前页”。扩展会解析当前 DOM 中已显示的职位，再发送到 `/api/boss/jobs/import`。
-6. 查看“处理总数”“新增”“更新”三项统计。服务未返回某一项时会显示“未知”，不会把处理总数误标为已导入数量。
+4. 点击 **测试连接**。
+5. 点击 **采集当前页**。
+6. 查看“处理总数”“新增”“更新”三项统计。
+7. 回到职启云帆的 **机会中心 → BOSS 职位收件箱** 查看并处理岗位。
 
-## 服务地址
+### 使用边界
 
-默认地址：`http://127.0.0.1:18001`。
+- 只读取你主动点击后当前活动标签页中已经渲染的职位；
+- 不自动翻页、滚动、点击职位或投递；
+- 不读取密码、聊天、Cookie 或其他标签页；
+- 不绕过登录、验证码和 BOSS 风控；
+- 最终简历确认、招呼语和投递由你在 BOSS 页面手动完成。
 
-地址可以是本机、RFC1918 局域网、`.local` 私有 DNS 或 Tailscale（`100.64/10`、`.ts.net`）服务。首次使用非本机地址时，扩展会在用户点击按钮后请求该主机的可选权限；公网地址会被拒绝。扩展默认只预授予以下本机 host 权限：
+### 常见问题
 
-- `http://127.0.0.1/*`
-- `http://localhost/*`
+**无法连接**：确认职启云帆已启动，打开 `http://127.0.0.1:18001/api/boss/health` 检查。
+
+**采集为空**：确认职位卡片或详情已经显示；页面改版、登录墙、验证码或尚未渲染的虚拟列表都可能无法识别。
+
+**服务地址变了**：在扩展弹窗更新地址并重新测试连接。
+
+完整教程见 [BOSS 接入教程](../docs/boss-integration.md)。
+
+---
+
+# 开发者文档
+
+## 扩展 ID 与 CORS
+
+`manifest.json` 包含固定公钥，扩展 ID 稳定为：
+
+```text
+jdacbgmhcbpkoccblehfahhoekjiiopl
+```
+
+后端默认只允许这个精确 Origin：
+
+```text
+chrome-extension://jdacbgmhcbpkoccblehfahhoekjiiopl
+```
+
+移动扩展目录不需要重新配置 CORS。修改公钥导致 ID 改变时，必须把完整新 Origin 加入 `YUNFAN_CORS_ORIGINS` 并重启服务。
 
 ## 权限
 
-- `activeTab`：仅在用户点击扩展图标后临时允许访问当前活动标签页，用于在该 BOSS 页面执行一次采集；页面导航或标签页关闭后授权失效。
-- `scripting`：只向上述已获临时授权的当前标签页注入职位解析器并执行采集。
-- `storage`：在本机保存用户配置的职启云帆服务地址。
-- `host_permissions`：只包含 `localhost` 和 `127.0.0.1`，用于访问本机职启云帆服务。
-- 扩展未声明 BOSS 站点的长期 host 权限，也不请求其他网站权限。
+- `activeTab`：用户点击扩展后临时访问当前活动标签页；
+- `scripting`：向当前标签页注入受控解析器；
+- `storage`：保存本机服务地址；
+- 默认 `host_permissions`：`http://127.0.0.1/*`、`http://localhost/*`。
 
-## 最终行为与隐私
+RFC1918 局域网、`.local`、Tailscale `100.64/10` 与 `.ts.net` 地址需要用户明确操作后请求可选 host 权限。公网地址被拒绝。
 
-- 只读取用户当前主动打开的 BOSS 页面 DOM。
-- 只采集当前页面已经渲染并可见的职位，不发起页面外的搜索、翻页或抓取请求。
-- 解析器会限制在职位卡片和职位详情语义容器内，并排除脚本、聊天及消息区域。
-- 详情页必须找到可见且可靠的职位详情语义容器；找不到时返回空结果和明确提示，不会回退扫描整份 `document`。
-- 职位详情和列表数据只用于本次用户点击后的本机导入，不自动翻页、滚动、点击职位或投递简历。
-- 采集字段为：`source_job_id`、`source_url`、`company`、`title`、`location`、`salary`、`experience`、`education`、`description`、`recruiter_name`、`recruiter_title`、`tags`、`fetched_at`。
-- 采集结果仅提交到用户配置的本机地址。
-- 最终职位筛选与简历投递必须由用户在 BOSS 页面人工确认并手动完成。
-- 统计数据语义固定为：`处理总数` 显示服务返回的 `total/processed`，`新增` 显示 `imported/created` 等字段，`更新` 显示 `updated`；缺少字段时显示“未知”。
+## 服务地址
+
+默认：
+
+```text
+http://127.0.0.1:18001
+```
+
+第一次使用非本机地址时，扩展会请求该主机权限。服务端必须：
+
+1. 绑定实际使用的私有地址；
+2. 将访问使用的 Host 加入 `YUNFAN_ALLOWED_HOSTS`；
+3. 对网页 Origin 配置精确 CORS；
+4. 仅限可信局域网或 Tailscale，禁止直接暴露公网。
+
+## 解析器契约
+
+解析器限制在职位卡片和职位详情语义容器内，并排除脚本、聊天和消息区域。详情页找不到可靠容器时返回空结果，不回退扫描整个 `document`。
+
+采集字段：
+
+```text
+source_job_id, source_url, company, title, location, salary,
+experience, education, description, recruiter_name,
+recruiter_title, tags, fetched_at
+```
+
+统计字段语义：
+
+- 处理总数：`total` / `processed`；
+- 新增：`imported` / `created`；
+- 更新：`updated`。
+
+缺少某字段时显示“未知”，不把处理总数误标为成功导入数。
+
+## API
+
+- `GET /api/boss/health`
+- `POST /api/boss/jobs/import`
+- `GET /api/boss/jobs?limit=50&offset=0`，默认 50、最大 200
+- `GET /api/boss/jobs/{id}`
+- `DELETE /api/boss/jobs/{id}`
 
 ## 测试
 
-在 `extension` 目录运行：
-
 ```powershell
-npm test
+cd extension
+npm.cmd test
 ```
 
-测试不依赖第三方 DOM 库，使用内置的最小 DOM 适配器读取 `tests/fixtures` 中的列表页与详情页样例。
+测试不依赖第三方 DOM 库，使用内置最小 DOM 适配器读取 `tests/fixtures` 的列表页和详情页样例。
 
-## 已知选择器风险
+## 已知风险
 
-BOSS 直聘的 class 名称和页面结构可能随版本、A/B 测试和登录状态变化。解析器使用多个语义 class 候选和职位详情链接作为回退，但页面大幅改版后仍可能需要更新选择器。登录墙、验证码、虚拟列表尚未渲染的卡片和动态详情面板也不在采集范围内。
+BOSS 直聘的 class 名称和 DOM 会随版本、A/B 测试和登录状态改变。解析器使用多个语义候选和详情链接回退，但大幅改版后仍需更新。虚拟列表未渲染内容、登录墙、验证码和聊天区域不在采集范围。

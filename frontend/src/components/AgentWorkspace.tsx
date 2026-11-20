@@ -302,7 +302,7 @@ export function AgentWorkspace({
   async function runAnalysis(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!activeResumeText.trim()) {
-      setAnalysisError("请选择已有简历、粘贴简历文本，或上传 PDF/TXT。");
+      setAnalysisError("请选择已有简历、粘贴简历文本，或上传 PDF/TXT/DOCX。");
       return;
     }
     if (!company.trim() || !title.trim() || !jdText.trim()) {
@@ -475,7 +475,7 @@ export function AgentWorkspace({
               <RefreshCcw size={17} />
               刷新健康状态
             </button>
-            <span>模型与密钥请在“BOSS 接入 → API 配置”中填写；密钥只保存在当前浏览器，不进入后端 .env、SQLite 或备份。</span>
+            <span>模型与密钥请在页面右上角“AI 服务配置”中填写；密钥只保存在当前浏览器，不写入后端 .env、SQLite 或服务端日志。</span>
           </div>
           {healthError ? <StatusMessage text={healthError} type="error" /> : null}
         </div>
@@ -496,7 +496,7 @@ export function AgentWorkspace({
                     <ClipboardPaste size={17} />粘贴文本
                   </button>
                   <button type="button" role="tab" aria-selected={resumeMode === "upload"} className={resumeMode === "upload" ? "is-active" : ""} onClick={() => setResumeMode("upload")}>
-                    <FileUp size={17} />上传 PDF/TXT
+                    <FileUp size={17} />上传 PDF/TXT/DOCX
                   </button>
                 </div>
 

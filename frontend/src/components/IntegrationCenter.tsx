@@ -163,9 +163,9 @@ export function IntegrationCenter({
     try {
       const saved = saveProviderSettings(providerSettings);
       setProviderSettings(saved);
-      setNotice({ type: "success", text: "API 配置已保存到当前浏览器；服务端和备份文件不会保存密钥。" });
+      setNotice({ type: "success", text: "AI 服务配置已保存到当前浏览器；服务端不会持久化密钥。" });
     } catch (error) {
-      setNotice({ type: "error", text: error instanceof Error ? error.message : "保存 API 配置失败。" });
+      setNotice({ type: "error", text: error instanceof Error ? error.message : "保存 AI 服务配置失败。" });
     }
   }
 
@@ -214,8 +214,8 @@ export function IntegrationCenter({
   }
 
   const workflow = [
-    { title: "启动本机服务", text: "在项目根目录运行 Docker 后，开发者模式下加载 extension 文件夹。", action: () => onGo("workspace"), icon: <PlugZap size={20} /> },
-    { title: "配置个人 API", text: "填写兼容 OpenAI 的地址、模型和密钥；密钥只留在当前浏览器。", action: () => onSectionChange("settings"), icon: <Settings2 size={20} /> },
+    { title: "启动服务并安装扩展", text: "先在项目根目录运行 Docker，再按下方步骤加载 extension 文件夹。", action: () => document.getElementById("boss-extension-install")?.scrollIntoView({ behavior: "smooth", block: "start" }), actionLabel: "查看安装步骤", icon: <PlugZap size={20} /> },
+    { title: "配置 AI 服务", text: "从页面右上角填写兼容 OpenAI 的地址、模型和密钥；密钥只留在当前浏览器。", action: () => onSectionChange("settings"), icon: <Settings2 size={20} /> },
     { title: "整理真实经历", text: "先在经历库确认项目、技能和工作经历，AI 不会把缺失项写成事实。", action: () => onGo("profile"), icon: <FileText size={20} /> },
     { title: "去 BOSS 采集职位", text: "登录 BOSS、打开搜索结果或职位详情，再点击扩展里的采集按钮。", action: () => window.open("https://www.zhipin.com/web/geek/job", "_blank", "noopener,noreferrer"), icon: <Cable size={20} /> },
     { title: "查看匹配并定制", text: "从职位池带入 JD 匹配，选择更适合的简历版式与内容。", action: () => onGo("optimizer"), icon: <Search size={20} /> },
@@ -320,17 +320,17 @@ export function IntegrationCenter({
                 <div className="integration-step-icon">{item.icon}</div>
                 <div><strong>{item.title}</strong><p>{item.text}</p></div>
                 <button className="text-button" type="button" onClick={item.action}>
-                  前往 <ArrowRight size={15} />
+                  {item.actionLabel ?? "前往"} <ArrowRight size={15} />
                 </button>
               </article>
             ))}
           </div>
 
-          <div className="integration-install">
+          <div className="integration-install" id="boss-extension-install">
             <div>
               <span className="integration-install__label">加载未打包扩展</span>
               <ol>
-                <li>打开 Chrome 或 Edge 的扩展管理页，并开启“开发者模式”。</li>
+                <li>打开 Chrome 或 Edge 的扩展管理页，并开启“开发者模式”。这只是加载本地扩展的浏览器开关，不需要编程。</li>
                 <li>选择“加载已解压的扩展程序”，指向项目根目录下的 <code>extension</code> 文件夹。</li>
                 <li>打开 BOSS 直聘搜索结果或职位详情，点击“职启云帆 BOSS 职位采集器”。</li>
                 <li>确认服务地址为 <code>http://127.0.0.1:18001</code>，先测试连接，再采集当前页。</li>
@@ -424,9 +424,9 @@ export function IntegrationCenter({
       ) : null}
 
       {section === "settings" ? (
-        <section aria-label="API 配置" className="integration-panel" id="integration-panel-settings" role="tabpanel">
+        <section aria-label="AI 服务配置" className="integration-panel" id="integration-panel-settings" role="tabpanel">
           <div className="integration-section-heading">
-            <div><span>只保存在当前浏览器 · 从更多任务进入</span><h3>AI 接口配置</h3></div>
+            <div><span>只保存在当前浏览器 · 从页面右上角进入</span><h3>AI 服务配置</h3></div>
             <span className="integration-lock"><ShieldCheck size={15} />不进入服务器数据库</span>
           </div>
           <form className="integration-settings" onSubmit={(event) => { event.preventDefault(); void saveSettings(); }}>
@@ -455,7 +455,7 @@ export function IntegrationCenter({
           </form>
           <div className="integration-security-note">
             <ShieldCheck size={20} />
-            <div><strong>密钥处理方式</strong><p>密钥不会写入 SQLite、JSON 备份、服务端日志或 Git。浏览器扩展只连接本机职位接口，不需要模型密钥。</p></div>
+            <div><strong>密钥处理方式</strong><p>密钥保存在当前浏览器，不会写入 SQLite、服务端日志或 Git。浏览器扩展只连接本机职位接口，不需要模型密钥。</p></div>
           </div>
         </section>
       ) : null}
