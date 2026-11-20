@@ -14,7 +14,7 @@ test.beforeEach(async ({ page }) => {
     });
   });
 });
-async function openBuilder(page: Page) {
+async function navigateToBuilder(page: Page) {
   await page.goto('/');
   await expect(page.locator('.workspace-loading')).toBeHidden({ timeout: 10_000 });
   const navigation = page.getByRole('navigation', { name: '主导航' });
@@ -31,8 +31,36 @@ async function openBuilder(page: Page) {
   } else {
     await navigation.getByRole('button', { name: '简历版本', exact: true }).click();
   }
+  await expect(page.locator('.builder-controls')).toBeVisible();
+}
+
+async function openBuilder(page: Page) {
+  await navigateToBuilder(page);
   await page.getByRole('button', { name: /^(新建|新建简历)$/ }).click();
   await expect(page.locator('.title-editor input')).toBeVisible();
+}
+
+type LayoutBox = { x: number; y: number; width: number; height: number };
+
+async function layoutBoxes(locator: Locator): Promise<LayoutBox[]> {
+  return locator.evaluateAll((elements) => elements.map((element) => {
+    const rect = element.getBoundingClientRect();
+    return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+  }));
+}
+
+function distinctAxisCount(values: number[], tolerance = 2) {
+  const positions: number[] = [];
+  for (const value of [...values].sort((left, right) => left - right)) {
+    if (!positions.some((position) => Math.abs(position - value) <= tolerance)) positions.push(value);
+  }
+  return positions.length;
+}
+
+async function openAppearance(page: Page) {
+  await page.getByText('排版与主题', { exact: true }).click();
+  await expect(page.locator('.resume-appearance')).toHaveJSProperty('open', true);
+  await expect(page.locator('.resume-appearance__grid')).toBeVisible();
 }
 
 async function separated(a: Locator, b: Locator) {
@@ -45,7 +73,7 @@ async function separated(a: Locator, b: Locator) {
   expect(overlapX <= 0 || overlapY <= 0, `overlapping controls: ${JSON.stringify({ one, two })}`).toBe(true);
 }
 
-for (const width of [1440, 1280, 1024, 768, 390, 320]) {
+for (const width of [1920, 1440, 1280, 1024, 768, 390, 320]) {
   test(`title and template controls stay separate at ${width}px`, async ({ page }) => {
     test.setTimeout(60_000);
     await page.setViewportSize({ width, height: 1000 });
@@ -66,6 +94,318 @@ for (const width of [1440, 1280, 1024, 768, 390, 320]) {
   });
 }
 
+test('empty builder presents creation and import paths without inactive layout controls', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await navigateToBuilder(page);
+
+  await expect.soft(page.locator('.builder-empty')).toHaveCount(1);
+  await expect.soft(page.getByRole('button', { name: '新建简历', exact: true })).toBeVisible();
+  await page.locator('.version-manager > summary').click();
+  await expect.soft(page.locator('.version-manager')).toHaveJSProperty('open', false);
+  await page.getByRole('button', { name: '上传 / 粘贴简历', exact: true }).click();
+  await expect.soft(page.locator('.version-manager')).toHaveJSProperty('open', true);
+  await expect.soft(page.getByLabel('导入后的版本名称', { exact: true })).toBeFocused();
+  const [importField, stickyHeader] = await Promise.all([
+    page.getByLabel('导入后的版本名称', { exact: true }).boundingBox(),
+    page.locator('.site-header').boundingBox(),
+  ]);
+  expect.soft(importField && stickyHeader, 'import field and sticky header').not.toBeNull();
+  if (importField && stickyHeader) {
+    expect.soft(importField.y, 'import field hidden under sticky header').toBeGreaterThanOrEqual(stickyHeader.y + stickyHeader.height - 1);
+    expect.soft(importField.y + importField.height, 'import field scrolled out of view').toBeLessThanOrEqual(page.viewportSize()!.height);
+  }
+  await expect.soft(page.getByText('还没有简历')).toHaveCount(0);
+  await expect.soft(page.getByText('从一份简历开始')).toHaveCount(0);
+  await expect.soft(page.locator('.version-picker')).toHaveCount(0);
+  await expect.soft(page.locator('.template-picker select')).toHaveCount(0);
+  await expect.soft(page.locator('.resume-appearance')).toHaveCount(0);
+  await expect.soft(page.locator('.builder-tabs:visible')).toHaveCount(0);
+  await expect.soft(page.locator('.builder-pane:visible')).toHaveCount(0);
+});
+
+test('desktop toolbar keeps three logical controls on row one and the create CTA fixed when appearance expands', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await openBuilder(page);
+
+  const builder = page.locator('.builder-controls');
+  expect.soft(await builder.evaluate((element) => element.tagName)).toBe('SECTION');
+
+  const childBoxes = await builder.locator(':scope > *').evaluateAll((elements) => elements.map((element) => {
+    const rect = element.getBoundingClientRect();
+    return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+  }));
+  const firstRowY = Math.min(...childBoxes.map((box) => box.y));
+  expect.soft(childBoxes.filter((box) => Math.abs(box.y - firstRowY) <= 1)).toHaveLength(3);
+
+  const create = page.getByRole('button', { name: '新建简历', exact: true });
+  const before = await create.boundingBox();
+  expect.soft(before).not.toBeNull();
+  if (!before) return;
+
+  const appearanceBefore = await page.locator('.resume-appearance').boundingBox();
+  expect.soft(appearanceBefore).not.toBeNull();
+  if (appearanceBefore) {
+    expect.soft(appearanceBefore.y).toBeGreaterThanOrEqual(before.y + before.height);
+  }
+
+  await openAppearance(page);
+  const after = await create.boundingBox();
+  expect.soft(after).not.toBeNull();
+  if (after) {
+    expect.soft(Math.abs(after.y - before.y)).toBeLessThanOrEqual(1);
+  }
+});
+
+test('tablet toolbar limits navigation and appearance controls at 1024px', async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 1000 });
+  await openBuilder(page);
+
+  const header = await page.locator('.site-header').boundingBox();
+  expect.soft(header).not.toBeNull();
+  if (header) expect.soft(header.height).toBeLessThanOrEqual(120);
+
+  await openAppearance(page);
+  const fields = await layoutBoxes(page.locator('.resume-appearance__grid > label:visible'));
+  expect.soft(fields).toHaveLength(6);
+  expect.soft(distinctAxisCount(fields.map((field) => field.x))).toBe(4);
+  fields.forEach((field, index) => {
+    expect.soft(field.width, `appearance field ${index + 1} is narrower than 180px`).toBeGreaterThanOrEqual(179.5);
+  });
+});
+
+test('layout breakpoint boundaries keep the primary toolbar stable', async ({ page }) => {
+  await page.setViewportSize({ width: 1181, height: 1000 });
+  await openBuilder(page);
+  const expectations: Array<{ width: number; firstRow: number; mobileNav: boolean; primaryColumns: number }> = [
+    { width: 1181, firstRow: 3, mobileNav: false, primaryColumns: 2 },
+    { width: 1180, firstRow: 2, mobileNav: false, primaryColumns: 2 },
+    { width: 881, firstRow: 2, mobileNav: false, primaryColumns: 2 },
+    { width: 880, firstRow: 2, mobileNav: true, primaryColumns: 2 },
+    { width: 761, firstRow: 2, mobileNav: true, primaryColumns: 2 },
+    { width: 760, firstRow: 1, mobileNav: true, primaryColumns: 1 },
+    { width: 370, firstRow: 1, mobileNav: true, primaryColumns: 1 },
+  ];
+  for (const expected of expectations) {
+    await page.setViewportSize({ width: expected.width, height: 1000 });
+    const header = await page.locator('.site-header').boundingBox();
+    expect.soft(header, `header at ${expected.width}px`).not.toBeNull();
+    if (header && expected.mobileNav) expect.soft(header.height, `header at ${expected.width}px`).toBeLessThanOrEqual(120);
+    await expect.soft(page.getByRole('button', { name: '展开导航', exact: true })).toBeVisible({ visible: expected.mobileNav });
+    const [version, template, create] = await Promise.all([
+      page.locator('.version-picker').boundingBox(),
+      page.locator('.template-picker').boundingBox(),
+      page.getByRole('button', { name: '新建简历', exact: true }).boundingBox(),
+    ]);
+    expect.soft(version && template && create, `primary controls at ${expected.width}px`).not.toBeNull();
+    if (version && template && create) {
+      expect.soft(distinctAxisCount([version.x, template.x]), `primary columns at ${expected.width}px`).toBe(expected.primaryColumns);
+      if (expected.firstRow === 3) {
+        expect.soft(Math.abs(create.y - version.y), `desktop CTA row at ${expected.width}px`).toBeLessThanOrEqual(1);
+      } else {
+        expect.soft(create.y, `stacked CTA row at ${expected.width}px`).toBeGreaterThanOrEqual(template.y + template.height - 1);
+      }
+    }
+    expect.soft(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), `horizontal overflow at ${expected.width}px`).toBe(true);
+  }
+});
+
+test('collapsed tablet toolbar uses two primary columns and three appearance columns at 768px', async ({ page }) => {
+  await page.setViewportSize({ width: 768, height: 1000 });
+  await openBuilder(page);
+
+  const header = await page.locator('.site-header').boundingBox();
+  expect.soft(header).not.toBeNull();
+  if (header) expect.soft(header.height).toBeLessThanOrEqual(120);
+
+  const [version, template] = await Promise.all([
+    page.locator('.version-picker').boundingBox(),
+    page.locator('.template-picker').boundingBox(),
+  ]);
+  expect.soft(version).not.toBeNull();
+  expect.soft(template).not.toBeNull();
+  if (version && template) {
+    expect.soft(Math.abs(version.y - template.y)).toBeLessThanOrEqual(1);
+    expect.soft(template.x).toBeGreaterThan(version.x);
+  }
+
+  await openAppearance(page);
+  const fields = await layoutBoxes(page.locator('.resume-appearance__grid > label:visible'));
+  expect.soft(fields).toHaveLength(6);
+  expect.soft(distinctAxisCount(fields.map((field) => field.x))).toBe(3);
+  fields.forEach((field, index) => {
+    expect.soft(field.width, `appearance field ${index + 1} is narrower than 180px`).toBeGreaterThanOrEqual(179.5);
+  });
+});
+
+test('preview actions switch from two columns to one column at the 370px boundary', async ({ page }) => {
+  await page.setViewportSize({ width: 371, height: 900 });
+  await openBuilder(page);
+  await page.getByRole('tab', { name: '预览', exact: true }).click();
+
+  for (const expected of [{ width: 371, columns: 2 }, { width: 370, columns: 1 }]) {
+    await page.setViewportSize({ width: expected.width, height: 900 });
+    const actions = await layoutBoxes(page.locator('.preview-actions button:visible'));
+    expect.soft(actions).toHaveLength(4);
+    expect.soft(distinctAxisCount(actions.map((action) => action.x)), `preview action columns at ${expected.width}px`).toBe(expected.columns);
+    expect.soft(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), `horizontal overflow at ${expected.width}px`).toBe(true);
+  }
+});
+
+test('mobile toolbar stacks primary controls and keeps appearance controls touchable at 390px', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 900 });
+  await openBuilder(page);
+
+  const [version, template] = await Promise.all([
+    page.locator('.version-picker').boundingBox(),
+    page.locator('.template-picker').boundingBox(),
+  ]);
+  expect.soft(version).not.toBeNull();
+  expect.soft(template).not.toBeNull();
+  if (version && template) {
+    expect.soft(distinctAxisCount([version.x, template.x])).toBe(1);
+    expect.soft(template.y).toBeGreaterThan(version.y + version.height);
+  }
+
+  await openAppearance(page);
+  const fields = await layoutBoxes(page.locator('.resume-appearance__grid > label:visible'));
+  expect.soft(fields).toHaveLength(6);
+  expect.soft(distinctAxisCount(fields.map((field) => field.x))).toBe(2);
+  fields.forEach((field, index) => {
+    expect.soft(field.width, `appearance field ${index + 1} is narrower than 140px`).toBeGreaterThanOrEqual(139.5);
+  });
+
+  const controls = await layoutBoxes(page.locator('.builder-controls button:visible, .builder-controls select:visible, .builder-controls input:visible, .builder-controls summary:visible'));
+  expect.soft(controls.length).toBeGreaterThan(0);
+  controls.forEach((control, index) => {
+    expect.soft(control.height, `visible toolbar target ${index + 1} is shorter than 44px`).toBeGreaterThanOrEqual(43.5);
+  });
+  expect.soft(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test('narrow preview actions form one column without horizontal overflow at 320px', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 900 });
+  await openBuilder(page);
+  await page.getByRole('tab', { name: '预览', exact: true }).click();
+
+  const actions = await layoutBoxes(page.locator('.preview-actions button:visible'));
+  expect.soft(actions).toHaveLength(4);
+  if (actions.length) {
+    const first = actions[0];
+    actions.forEach((action, index) => {
+      expect.soft(Math.abs(action.x - first.x), `preview action ${index + 1} is not aligned with the first action`).toBeLessThanOrEqual(1);
+      expect.soft(Math.abs(action.width - first.width), `preview action ${index + 1} is not full-width like the first action`).toBeLessThanOrEqual(1);
+      if (index > 0) {
+        const previous = actions[index - 1];
+        expect.soft(action.y, `preview action ${index + 1} overlaps the previous action`).toBeGreaterThanOrEqual(previous.y + previous.height - 0.5);
+      }
+    });
+  }
+  expect.soft(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test('appearance numeric inputs clamp out-of-range values to supported limits', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await openBuilder(page);
+  await openAppearance(page);
+
+  const fontSize = page.getByRole('spinbutton', { name: /^字号/ });
+  const lineHeight = page.getByRole('spinbutton', { name: /^行距/ });
+  const pageMargin = page.getByRole('spinbutton', { name: /^页边距/ });
+
+  await fontSize.fill('');
+  await fontSize.pressSequentially('1');
+  await expect.soft(fontSize).toHaveValue('1');
+  await fontSize.pressSequentially('3');
+  await expect.soft(fontSize).toHaveValue('13');
+  await fontSize.fill('99');
+  await fontSize.press('Enter');
+  await expect.soft(fontSize).toHaveValue('16');
+  await fontSize.fill('');
+  await fontSize.press('Tab');
+  await expect.soft(fontSize).toHaveValue('16');
+
+  await lineHeight.fill('0.5');
+  await lineHeight.press('Tab');
+  await expect.soft(lineHeight).toHaveValue('1.25');
+
+  await pageMargin.fill('40');
+  await pageMargin.press('Tab');
+  await expect.soft(pageMargin).toHaveValue('24');
+});
+
+test('upload notice updates a polite live status region', async ({ page }) => {
+  await openBuilder(page);
+  await page.locator('.version-manager > summary').click();
+  const status = page.locator('.resume-upload-row [role="status"]:visible');
+  expect.soft(await status.count()).toBe(1);
+  if (await status.count()) {
+    await expect.soft(status).toHaveAttribute('aria-live', 'polite');
+
+    let parseRequestCount = 0;
+    await page.route('**/api/parse/resume', async (route) => {
+      parseRequestCount += 1;
+      expect(route.request().postDataBuffer()?.length).toBeGreaterThan(0);
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      await route.fulfill({ json: { text: '王上传\nwang@example.com\n项目经历\n使用 FastAPI 完成简历解析服务。', filename: 'uploaded-resume.txt' } });
+    });
+    const fileChooser = page.waitForEvent('filechooser');
+    await page.getByText('上传 PDF / TXT / DOCX', { exact: true }).click();
+    const chooser = await fileChooser;
+    await chooser.setFiles({
+      name: 'uploaded-resume.docx',
+      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      buffer: Buffer.from('uploaded resume', 'utf8'),
+    });
+    await expect.soft(status).toHaveAttribute('aria-busy', 'true');
+    await expect.soft(status).toContainText('正在解析 uploaded-resume.docx');
+    await expect.soft(page.locator('.resume-upload-row input[type="file"]')).toHaveAttribute('aria-disabled', 'true');
+    const blockedFileChooser = page.waitForEvent('filechooser', { timeout: 450 }).catch(() => null);
+    await page.locator('.resume-upload-row label').click();
+    expect.soft(await blockedFileChooser, 'busy upload opened a second file chooser').toBeNull();
+    await expect.soft(status).toContainText('已解析 uploaded-resume.docx');
+    expect.soft(parseRequestCount, 'duplicate upload request count').toBe(1);
+    await expect.soft(status).toHaveAttribute('aria-busy', 'false');
+  }
+});
+
+test('review checkbox exposes at least a 44px labelled hit target', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 900 });
+  await openBuilder(page);
+
+  const checkbox = page.getByRole('checkbox', { name: '我已核对', exact: true });
+  const hitArea = await checkbox.evaluate((element) => {
+    const label = element.closest('label');
+    if (!label) return null;
+    const rect = label.getBoundingClientRect();
+    return { width: rect.width, height: rect.height };
+  });
+  expect.soft(hitArea).not.toBeNull();
+  if (hitArea) {
+    expect.soft(hitArea.width).toBeGreaterThanOrEqual(44);
+    expect.soft(hitArea.height).toBeGreaterThanOrEqual(44);
+  }
+});
+
+test('main content focus is visibly outlined after keyboard skip navigation', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  await expect(page.locator('.workspace-loading')).toBeHidden({ timeout: 10_000 });
+
+  const main = page.locator('#main-content');
+  const skip = page.getByRole('link', { name: '跳到主要内容', exact: true });
+  await page.keyboard.press('Tab');
+  await expect.soft(skip).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect.soft(main).toBeFocused();
+
+  const focusStyle = await main.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { outlineStyle: style.outlineStyle, outlineWidth: style.outlineWidth, outlineColor: style.outlineColor };
+  });
+  expect.soft(focusStyle.outlineStyle, `main focus style: ${JSON.stringify(focusStyle)}`).toBe('solid');
+  expect.soft(Number.parseFloat(focusStyle.outlineWidth), `main focus style: ${JSON.stringify(focusStyle)}`).toBeGreaterThanOrEqual(3);
+  expect.soft(focusStyle.outlineColor, `main focus style: ${JSON.stringify(focusStyle)}`).toBe('rgb(7, 84, 126)');
+});
 test('workspace hydration blocks editing until the server snapshot resolves', async ({ page }) => {
   await page.unroute('**/api/workspace');
   await page.route('**/api/workspace', async (route) => {
@@ -168,7 +508,7 @@ test('local edits become dirty before the debounce and survive an immediate relo
 
   await page.reload();
   await expect(page.locator('.workspace-loading')).toBeHidden({ timeout: 10_000 });
-  await expect(page.locator('.header-person strong')).toHaveText('本地即时修改');
+  await expect(page.locator('.header-person strong')).toHaveText('本地即时修改', { timeout: 10_000 });
 });
 
 test('the top header stays pinned while scrolling', async ({ page }) => {
@@ -244,7 +584,7 @@ test('top navigation and editor/preview tabs remain operable', async ({ page }) 
     await picker.selectOption(value);
     await expect(page.locator('.resume-paper')).toHaveClass(new RegExp(`resume-paper--${value}`));
     await expect(page.locator('.resume-paper section[data-section-id]')).toHaveCount(7);
-    await expect(page.getByLabel('主题色', { exact: true })).not.toHaveValue('');
+    await expect(page.locator('#resume-accent-color')).not.toHaveValue('');
   }
   await page.getByRole('tab', { name: '编辑', exact: true }).click();
   await expect(page.locator('.resume-editor')).toBeVisible();
@@ -321,12 +661,12 @@ test('appearance controls update preview, persist, and keep resume content', asy
   await page.getByLabel('姓名', { exact: true }).fill('排版保留测试');
   await page.locator('.template-picker select').selectOption('academic');
   await page.getByText('排版与主题', { exact: true }).click();
-  await page.getByLabel('页面容量', { exact: true }).selectOption('2');
-  await page.getByLabel('字体', { exact: true }).selectOption('serif');
-  await page.getByLabel('字号', { exact: true }).fill('13');
-  await page.getByLabel('行距', { exact: true }).fill('1.7');
-  await page.getByLabel('页边距', { exact: true }).fill('18');
-  await page.getByLabel('主题色', { exact: true }).selectOption('#245f82');
+  await page.getByRole('combobox', { name: '页面容量', exact: true }).selectOption('2');
+  await page.getByRole('combobox', { name: '字体', exact: true }).selectOption('serif');
+  await page.getByRole('spinbutton', { name: /^字号/ }).fill('13');
+  await page.getByRole('spinbutton', { name: /^行距/ }).fill('1.7');
+  await page.getByRole('spinbutton', { name: /^页边距/ }).fill('18');
+  await page.getByRole('combobox', { name: '主题色', exact: true }).selectOption('#245f82');
   await page.getByRole('tab', { name: '预览', exact: true }).click();
   const paper = page.locator('.resume-paper');
   await expect(paper).toContainText('排版保留测试');

@@ -25,7 +25,7 @@ import {
   Eye,
   Plus,
 } from "lucide-react";
-import { ChangeEvent, CSSProperties, FormEvent, useMemo, useState } from "react";
+import { ChangeEvent, CSSProperties, FormEvent, useMemo, useRef, useState } from "react";
 import { agentApi } from "./agentApi";
 import { RESUME_ACCENT_OPTIONS, RESUME_FONT_OPTIONS, getResumeFontOption, getResumeTemplateDefinition, isSidebarResumeLayout } from "./templateCatalog";
 import { RESUME_TEMPLATE_OPTIONS, STATUS_OPTIONS } from "./constants";
@@ -65,6 +65,59 @@ function isApplicationStatus(value: string): value is ApplicationStatus {
 
 function isResumeTemplate(value: string): value is ResumeTemplate {
   return RESUME_TEMPLATE_OPTIONS.some((option) => option.value === value);
+}
+
+function clampAppearanceValue(value: number, min: number, max: number, fallback: number) {
+  if (!Number.isFinite(value)) return fallback;
+  return Math.min(max, Math.max(min, value));
+}
+
+function AppearanceNumberField({
+  id,
+  label,
+  min,
+  max,
+  step,
+  value,
+  onCommit,
+}: {
+  id: string;
+  label: string;
+  min: number;
+  max: number;
+  step: number;
+  value: number;
+  onCommit: (value: number) => void;
+}) {
+  const [draft, setDraft] = useState(() => String(value));
+  const [editing, setEditing] = useState(false);
+  const commitDraft = () => {
+    const parsed = draft.trim() === '' ? Number.NaN : Number(draft);
+    const nextValue = clampAppearanceValue(parsed, min, max, value);
+    if (nextValue !== value) onCommit(nextValue);
+    setEditing(false);
+  };
+  return (
+    <label htmlFor={id}>
+      <span>{label}</span>
+      <input
+        id={id}
+        type="number"
+        min={min}
+        max={max}
+        step={step}
+        value={editing ? draft : String(value)}
+        onFocus={() => { setDraft(String(value)); setEditing(true); }}
+        onChange={(event) => {
+          setDraft(event.currentTarget.value);
+          const parsed = Number(event.currentTarget.value);
+          if (Number.isFinite(parsed) && parsed >= min && parsed <= max) onCommit(parsed);
+        }}
+        onBlur={commitDraft}
+        onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }}
+      />
+    </label>
+  );
 }
 
 export function WorkspaceView({
@@ -356,8 +409,11 @@ export function BuilderView({
   const [managerOpen, setManagerOpen] = useState(!selectedResume);
   const [resumeUploading, setResumeUploading] = useState(false);
   const [resumeUploadNotice, setResumeUploadNotice] = useState("");
+  const versionManagerRef = useRef<HTMLDetailsElement>(null);
+  const importTitleRef = useRef<HTMLInputElement>(null);
 
   async function handleResumeFileUpload(event: ChangeEvent<HTMLInputElement>) {
+    if (resumeUploading) return;
     const file = event.currentTarget.files?.[0];
     event.currentTarget.value = "";
     if (!file) return;
@@ -379,97 +435,134 @@ export function BuilderView({
   }
   const switchToEditor = () => { setActivePane("editor"); setManagerOpen(false); };
   const switchToPreview = () => { setActivePane("preview"); setManagerOpen(false); };
+  const focusImportPanel = () => {
+    setManagerOpen(true);
+    requestAnimationFrame(() => {
+      versionManagerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      importTitleRef.current?.focus();
+    });
+  };
 
   return (
     <div className="builder-layout">
-      <div className="builder-controls" aria-label="简历工作区工具栏">
-        <label className="version-picker">
-          <span>当前版本</span>
-          <select value={selectedResume?.id ?? ""} onChange={(event) => onSelectResume(event.currentTarget.value)}>
-            {!resumes.length ? <option value="">先创建或导入一份简历</option> : resumes.map((resume) => <option key={resume.id} value={resume.id}>{resume.title}</option>)}
-          </select>
-          <small>{resumes.length ? `共 ${resumes.length} 个版本 · 内容保存在当前浏览器` : "从经历库创建，也可以导入已有文本"}</small>
-        </label>
-        <label className="template-picker">
-          <span>简历版式</span>
-          <select disabled={!selectedResume} value={selectedResume?.template ?? "graduate"} onChange={(event) => {
-            const nextTemplate = event.currentTarget.value;
-            if (selectedResume && isResumeTemplate(nextTemplate)) onTemplateChange(selectedResume.id, nextTemplate);
-          }}>
-            {RESUME_TEMPLATE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-          </select>
-          <small>{selectedTemplateOption?.description ?? "先选择版本，再挑选适合的版式"}</small>
-        </label>
-        <details className="resume-appearance">
-          <summary>
-            <span>排版与主题</span>
-            <small>{selectedAppearance ? `${selectedAppearance.pageCount === 1 ? "单页" : "双页"} · ${selectedAppearance.fontSize}pt · ${selectedAppearance.pageMargin}mm 边距` : "先选择简历版本"}</small>
-          </summary>
-          {selectedAppearance ? (
-            <div className="resume-appearance__grid">
-              <label>
-                <span>页面容量</span>
-                <select aria-label="页面容量" value={selectedAppearance.pageCount} onChange={(event) => updateAppearance({ pageCount: Number(event.currentTarget.value) === 2 ? 2 : 1 })}>
-                  <option value="1">单页优先</option>
-                  <option value="2">双页舒展</option>
-                </select>
-              </label>
-              <label>
-                <span>字体</span>
-                <select aria-label="字体" value={selectedAppearance.fontFamily} onChange={(event) => updateAppearance({ fontFamily: event.currentTarget.value as ResumeAppearance["fontFamily"] })}>
-                  {RESUME_FONT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                </select>
-              </label>
-              <label>
-                <span>字号</span>
-                <input aria-label="字号" type="number" min="10.5" max="16" step="0.5" value={selectedAppearance.fontSize} onChange={(event) => updateAppearance({ fontSize: Number(event.currentTarget.value) || selectedAppearance.fontSize })} />
-              </label>
-              <label>
-                <span>行距</span>
-                <input aria-label="行距" type="number" min="1.25" max="2" step="0.05" value={selectedAppearance.lineHeight} onChange={(event) => updateAppearance({ lineHeight: Number(event.currentTarget.value) || selectedAppearance.lineHeight })} />
-              </label>
-              <label>
-                <span>页边距</span>
-                <input aria-label="页边距" type="number" min="12" max="24" step="1" value={selectedAppearance.pageMargin} onChange={(event) => updateAppearance({ pageMargin: Number(event.currentTarget.value) || selectedAppearance.pageMargin })} />
-              </label>
-              <label>
-                <span>主题色</span>
-                <select aria-label="主题色" value={selectedAppearance.accent ?? getResumeTemplateDefinition(selectedResume?.template ?? "graduate").accent} onChange={(event) => updateAppearance({ accent: event.currentTarget.value })}>
-                  {RESUME_ACCENT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                </select>
-              </label>
+      <section className={`builder-controls${selectedResume ? "" : " builder-empty"}`} aria-label="简历工作区工具栏">
+        {selectedResume ? (
+          <>
+            <label className="version-picker">
+              <span>当前版本</span>
+              <select value={selectedResume.id} onChange={(event) => onSelectResume(event.currentTarget.value)}>
+                {resumes.map((resume) => <option key={resume.id} value={resume.id}>{resume.title}</option>)}
+              </select>
+              <small>共 {resumes.length} 个版本 · 内容保存在当前浏览器</small>
+            </label>
+            <label className="template-picker">
+              <span>简历版式</span>
+              <select value={selectedResume.template} onChange={(event) => {
+                const nextTemplate = event.currentTarget.value;
+                if (isResumeTemplate(nextTemplate)) onTemplateChange(selectedResume.id, nextTemplate);
+              }}>
+                {RESUME_TEMPLATE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
+              <small>{selectedTemplateOption?.description}</small>
+            </label>
+            <div className="builder-controls__actions">
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => {
+                  onGenerate();
+                  switchToEditor();
+                }}
+              >
+                <Plus size={18} />
+                新建简历
+              </button>
             </div>
-          ) : null}
-        </details>
-        <div className="builder-controls__actions">
-          <button
-            className="secondary-button"
-            type="button"
-            onClick={() => {
-              onGenerate();
-              switchToEditor();
-            }}
-          >
-            <Plus size={18} />
-            新建简历
-          </button>
-        </div>
-      </div>
+            <details className="resume-appearance">
+              <summary>
+                <span>排版与主题</span>
+                <small>{selectedAppearance ? `${selectedAppearance.pageCount === 1 ? "单页" : "双页"} · ${selectedAppearance.fontSize}pt · ${selectedAppearance.pageMargin}mm 边距` : "先选择简历版本"}</small>
+              </summary>
+              {selectedAppearance ? (
+                <div className="resume-appearance__grid">
+                  <label htmlFor="resume-page-capacity">
+                    <span>页面容量</span>
+                    <select id="resume-page-capacity" value={selectedAppearance.pageCount} onChange={(event) => updateAppearance({ pageCount: Number(event.currentTarget.value) === 2 ? 2 : 1 })}>
+                      <option value="1">单页优先</option>
+                      <option value="2">双页舒展</option>
+                    </select>
+                  </label>
+                  <label htmlFor="resume-font-family">
+                    <span>字体</span>
+                    <select id="resume-font-family" value={selectedAppearance.fontFamily} onChange={(event) => updateAppearance({ fontFamily: event.currentTarget.value as ResumeAppearance["fontFamily"] })}>
+                      {RESUME_FONT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                    </select>
+                  </label>
+                  <AppearanceNumberField id="resume-font-size" label="字号（10.5–16 pt）" min={10.5} max={16} step={0.5} value={selectedAppearance.fontSize} onCommit={(fontSize) => updateAppearance({ fontSize })} />
+                  <AppearanceNumberField id="resume-line-height" label="行距（1.25–2）" min={1.25} max={2} step={0.05} value={selectedAppearance.lineHeight} onCommit={(lineHeight) => updateAppearance({ lineHeight })} />
+                  <AppearanceNumberField id="resume-page-margin" label="页边距（12–24 mm）" min={12} max={24} step={1} value={selectedAppearance.pageMargin} onCommit={(pageMargin) => updateAppearance({ pageMargin })} />
+                  <label htmlFor="resume-accent-color">
+                    <span>主题色</span>
+                    <select id="resume-accent-color" value={selectedAppearance.accent ?? getResumeTemplateDefinition(selectedResume.template).accent} onChange={(event) => updateAppearance({ accent: event.currentTarget.value })}>
+                      {RESUME_ACCENT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                    </select>
+                  </label>
+                </div>
+              ) : null}
+            </details>
+          </>
+        ) : (
+          <div className="builder-empty__content">
+            <div>
+              <strong>从第一份简历开始</strong>
+              <small>从经历库生成，或上传 / 粘贴已有简历。</small>
+            </div>
+            <div className="builder-empty__actions">
+              <button className="primary-button" type="button" onClick={() => { onGenerate(); switchToEditor(); }}>
+                <Plus size={18} />
+                新建简历
+              </button>
+              <button className="secondary-button" type="button" aria-controls="version-manager" aria-expanded={managerOpen} onClick={focusImportPanel}>
+                <Upload size={17} />
+                上传 / 粘贴简历
+              </button>
+            </div>
+          </div>
+        )}
+      </section>
 
-      <details className="version-manager" open={managerOpen} onToggle={(event) => setManagerOpen(event.currentTarget.open)}>
+      <details id="version-manager" className="version-manager" open={managerOpen} onToggle={(event) => setManagerOpen(event.currentTarget.open)} ref={versionManagerRef}>
         <summary><span><Library size={18} />版本与导入</span><span className="version-manager__summary">管理已有版本或粘贴简历<ChevronDown size={16} /></span></summary>
         <div className="version-manager__body">
 
         <div className="import-panel">
           <strong>上传或粘贴已有简历</strong>
-          <label><span>导入后的版本名称</span><input value={pasteTitle} onChange={(event) => setPasteTitle(event.target.value)} placeholder="例如：Python 后端基础版" /></label>
+          <label htmlFor="resume-import-title"><span>导入后的版本名称</span><input id="resume-import-title" ref={importTitleRef} value={pasteTitle} onChange={(event) => setPasteTitle(event.target.value)} placeholder="例如：Python 后端基础版" /></label>
           <div className="resume-upload-row">
-            <label className="secondary-button file-button">
+            <label
+              className="secondary-button file-button"
+              aria-disabled={resumeUploading}
+              data-busy={resumeUploading ? "true" : "false"}
+              onClick={(event) => {
+                if (resumeUploading) event.preventDefault();
+              }}
+            >
               <Upload size={17} />
               {resumeUploading ? "解析中…" : "上传 PDF / TXT / DOCX"}
-              <input type="file" accept=".pdf,.txt,.docx,application/pdf,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={handleResumeFileUpload} disabled={resumeUploading} />
+              <input
+                type="file"
+                accept=".pdf,.txt,.docx,application/pdf,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                aria-disabled={resumeUploading}
+                data-busy={resumeUploading ? "true" : "false"}
+                onClick={(event) => {
+                  if (resumeUploading) event.preventDefault();
+                }}
+                onChange={handleResumeFileUpload}
+              />
             </label>
-            <small>{resumeUploadNotice || "支持 PDF、TXT 和现代 .docx；上传后会提取文字并进入下面的核对流程，之后可编辑、优化、匹配和导出。"}</small>
+            <small role="status" aria-live="polite" aria-atomic="true" aria-busy={resumeUploading}>
+              {resumeUploadNotice || "支持 PDF、TXT 和现代 .docx；上传后会提取文字并进入下面的核对流程，之后可编辑、优化、匹配和导出。"}
+            </small>
           </div>
           <label><span>已有简历文本</span>
           <textarea
@@ -493,37 +586,35 @@ export function BuilderView({
           </button>
         </div>
 
-        <div className="version-manager__list">
-        <div className="resume-list" aria-label="已有简历版本">
-          {resumes.length ? (
-            resumes.map((resume) => (
-              <button
-                className={`resume-item ${selectedResume?.id === resume.id ? "resume-item--active" : ""}`}
-                key={resume.id}
-                type="button"
-                onClick={() => {
-                  onSelectResume(resume.id);
-                  switchToEditor();
-                }}
-              >
-                <strong>{resume.title}</strong>
-                <span>
-                  {resume.source === "optimized" ? "岗位定制" : resume.source === "uploaded" ? "文本导入" : "基础生成"} ·{" "}
-                  {formatDate(resume.updatedAt)}
-                </span>
+        {resumes.length ? (
+          <div className="version-manager__list">
+            <div className="resume-list" aria-label="已有简历版本">
+              {resumes.map((resume) => (
+                <button
+                  className={`resume-item ${selectedResume?.id === resume.id ? "resume-item--active" : ""}`}
+                  key={resume.id}
+                  type="button"
+                  onClick={() => {
+                    onSelectResume(resume.id);
+                    switchToEditor();
+                  }}
+                >
+                  <strong>{resume.title}</strong>
+                  <span>
+                    {resume.source === "optimized" ? "岗位定制" : resume.source === "uploaded" ? "文本导入" : "基础生成"} ·{" "}
+                    {formatDate(resume.updatedAt)}
+                  </span>
+                </button>
+              ))}
+            </div>
+            {selectedResume ? (
+              <button className="destructive-button version-delete-button" type="button" onClick={() => onDelete(selectedResume.id)}>
+                <Trash2 size={17} />
+                删除当前版本
               </button>
-            ))
-          ) : (
-            <EmptyState title="还没有简历" text="先新建，或导入已有简历文本。" />
-          )}
-        </div>
-        {selectedResume ? (
-          <button className="destructive-button version-delete-button" type="button" onClick={() => onDelete(selectedResume.id)}>
-            <Trash2 size={17} />
-            删除当前版本
-          </button>
+            ) : null}
+          </div>
         ) : null}
-        </div>
         </div>
       </details>
 
@@ -578,9 +669,7 @@ export function BuilderView({
             ) : null}
             <ReviewNotice resume={selectedResume} onMarkReviewed={onMarkReviewed} />
           </>
-        ) : (
-          <EmptyState title="从一份简历开始" text="在上方新建简历，或展开“版本与导入”粘贴已有内容。" />
-        )}
+        ) : null}
       </section>
 
       <section id="builder-preview" className="builder-pane builder-pane--preview" role="tabpanel" aria-labelledby="builder-tab-preview" hidden={activePane !== "preview"} tabIndex={0}>
@@ -610,9 +699,7 @@ export function BuilderView({
             <div className="preview-canvas"><ResumePaper profile={profile} resume={selectedResume} /></div>
             <ReviewNotice resume={selectedResume} onMarkReviewed={onMarkReviewed} />
           </>
-        ) : (
-          <EmptyState title="暂无预览" text="选择或保存一个简历版本后，这里会显示 A4 预览。" />
-        )}
+        ) : null}
       </section>
     </div>
   );
