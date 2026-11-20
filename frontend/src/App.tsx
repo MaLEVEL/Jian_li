@@ -1,5 +1,4 @@
 import {
-  AlertTriangle,
   ScanSearch,
   BriefcaseBusiness,
   Cable,
@@ -48,7 +47,6 @@ import {
 import type { BossJobRecord } from "./bossIntegration";
 import {
   WorkspaceConflictError,
-  clearWorkspaceSyncMeta,
   createWorkspaceApi,
   loadWorkspaceSyncMeta,
   markWorkspaceClean,
@@ -137,7 +135,6 @@ export default function App() {
   const workspaceSaveChain = useRef<Promise<boolean>>(Promise.resolve(false));
   const siteHeaderRef = useRef<HTMLElement | null>(null);
   const suppressNextWorkspaceSave = useRef(false);
-  const [workspaceSync, setWorkspaceSync] = useState<"connecting" | "saved" | "error">("connecting");
   const [workspaceReady, setWorkspaceReady] = useState(false);
   const [workspaceConflict, setWorkspaceConflict] = useState<WorkspaceEnvelope | undefined>();
   const [activeTab, setActiveTab] = useState<TabId>("workspace");
@@ -304,7 +301,6 @@ export default function App() {
           if (localSync.dirty && localSync.revision !== remote.revision) {
             workspaceSyncBlocked.current = true;
             setWorkspaceConflict(remote);
-            setWorkspaceSync("error");
             suppressNextWorkspaceSave.current = suppressInitialAutosave;
             setWorkspaceReady(true);
             return;
@@ -318,10 +314,8 @@ export default function App() {
             setJobPool(restored.jobPool);
             setSelectedResumeId(restored.resumes[0]?.id ?? "");
             markWorkspaceClean(remote.revision);
-            setWorkspaceSync("saved");
           } else {
             markWorkspaceDirty(remote.revision);
-            setWorkspaceSync("connecting");
             suppressInitialAutosave = false;
           }
         } else {
@@ -332,7 +326,6 @@ export default function App() {
           if (cancelled) return;
           workspaceRevision.current = created.revision;
           markWorkspaceClean(created.revision);
-          setWorkspaceSync("saved");
         }
         window.setTimeout(() => {
           if (!cancelled) {
@@ -344,7 +337,6 @@ export default function App() {
       } catch {
         if (cancelled) return;
         markWorkspaceDirty(localSync.revision ?? workspaceRevision.current);
-        setWorkspaceSync("error");
         suppressNextWorkspaceSave.current = true;
         skipWorkspaceSave.current = false;
         setWorkspaceReady(true);
@@ -366,10 +358,8 @@ export default function App() {
         workspaceSyncBlocked.current = false;
         markWorkspaceClean(saved.revision);
         setWorkspaceConflict(undefined);
-        setWorkspaceSync("saved");
         return true;
       } catch (error) {
-        setWorkspaceSync("error");
         if (error instanceof WorkspaceConflictError) {
           workspaceSyncBlocked.current = true;
           setWorkspaceConflict(error.current);
@@ -403,7 +393,6 @@ export default function App() {
     workspaceRevision.current = workspaceConflict.revision;
     workspaceSyncBlocked.current = false;
     setWorkspaceConflict(undefined);
-    setWorkspaceSync("connecting");
     void saveWorkspaceSnapshot(workspaceConflict.revision);
   }
 
@@ -421,7 +410,6 @@ export default function App() {
     workspaceSyncBlocked.current = false;
     markWorkspaceClean(workspaceConflict.revision);
     setWorkspaceConflict(undefined);
-    setWorkspaceSync("saved");
     setMessage("已载入服务器上的最新版本，本地冲突副本不再覆盖服务器。", "warning");
   }
 
@@ -1230,31 +1218,6 @@ export default function App() {
     }
   }
 
-  function clearLocalData() {
-    const ok = window.confirm("确定清空简历、经历库和投递记录吗？API 配置与 BOSS 职位池会保留。");
-    if (!ok) {
-      return;
-    }
-
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      // Ignore storage cleanup failures; resetting React state is enough for the current page.
-    }
-    setProfile(DEFAULT_PROFILE);
-    setResumes([]);
-    setApplications([]);
-    setOpportunities([]);
-    setJobPool({ savedViews: [] });
-    clearWorkspaceSyncMeta();
-    setSelectedResumeId("");
-    setJobDraft(EMPTY_JOB);
-    setPasteTitle("我的已有简历");
-    setPasteText("");
-    navigateTo("workspace");
-    setMessage("已清空简历、经历库、投递记录和机会漏斗；服务器将同步这次更改。");
-  }
-
   const pageCopy: Record<TabId, { title: string; description: string }> = {
     workspace: { title: "今日驾驶舱", description: "先处理时间敏感的动作，再让机会、材料和面试准备稳步推进。" },
     integration: { title: "机会中心", description: "把发现、判断、材料、跟进和面试放在同一条清晰路径里。" },
@@ -1658,8 +1621,6 @@ export default function App() {
               <div className="mobile-task-panel" aria-label="更多任务">
                 <strong>更多任务</strong>
                 <button type="button" onClick={() => navigateTo("agent")}>岗位分析</button>
-                <button type="button" onClick={() => openIntegrationSection("settings")}>API 配置</button>
-                <button type="button" onClick={() => document.querySelector<HTMLElement>(".data-settings > summary")?.click()}>数据设置</button>
               </div>
             ) : null}
           </div>
@@ -1673,39 +1634,28 @@ export default function App() {
             <p className="page-description">{pageCopy[activeTab].description}</p>
           </div>
           <div className="topbar-actions">
-            <details className="data-settings">
-              <summary aria-label="数据设置">
-                <Settings size={17} />
-                数据设置
-              </summary>
-              <div className="data-settings__menu">
-                <button className="ghost-button" type="button" onClick={() => openIntegrationSection("settings")}>
-                  <Settings size={17} />
-                  API 接入配置
-                </button>
-                <p className="data-settings__help">简历与投递会同步到本机 Docker 中的 SQLite；API Key 只保存在当前浏览器。当前状态：{workspaceConflict ? "服务器有更新，本地修改已保留" : workspaceSync === "saved" ? "服务器已同步" : workspaceSync === "error" ? "服务器暂不可用，已保存本地副本" : "正在连接服务器"}。</p>
-                {workspaceConflict ? (
-                  <div className="workspace-conflict" role="alert">
-                    <strong>发现另一台设备的更新</strong>
-                    <p>当前浏览器中的修改没有丢失。请选择要保留的版本。</p>
-                    <div className="workspace-conflict__actions">
-                      <button className="primary-button" type="button" onClick={keepLocalWorkspaceVersion}>保留本地并覆盖服务器</button>
-                      <button className="ghost-button" type="button" onClick={loadServerWorkspaceVersion}>载入服务器版本</button>
-                    </div>
-                  </div>
-                ) : null}
-                <p className="data-settings__help">数据导入和导出已放到对应页面：简历页上传/导出简历，机会页导入/导出机会，跟进页导出投递记录。</p>
-                <div className="danger-zone">
-                  <strong>危险操作</strong>
-                  <button className="destructive-button" type="button" onClick={clearLocalData}>
-                    <AlertTriangle size={17} />
-                    清空简历与投递
-                  </button>
-                </div>
-              </div>
-            </details>
+            <button
+              className="secondary-button"
+              type="button"
+              aria-label="AI 服务配置"
+              onClick={() => openIntegrationSection("settings")}
+            >
+              <Settings size={17} />
+              AI 服务配置
+            </button>
           </div>
         </header>
+
+        {workspaceConflict ? (
+          <div className="workspace-conflict" role="alert">
+            <strong>发现另一台设备的更新</strong>
+            <p>当前浏览器中的修改没有丢失。请选择要保留的版本。</p>
+            <div className="workspace-conflict__actions">
+              <button className="primary-button" type="button" onClick={keepLocalWorkspaceVersion}>保留本地并覆盖服务器</button>
+              <button className="ghost-button" type="button" onClick={loadServerWorkspaceVersion}>载入服务器版本</button>
+            </div>
+          </div>
+        ) : null}
 
         {message ? <StatusMessage text={message.text} type={message.type} /> : null}
 

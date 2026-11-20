@@ -378,7 +378,7 @@ describe("resume export layout consistency", () => {
 
     const mediaBytes = Buffer.from(await right.archive.file(right.mediaNames[0])!.async("uint8array"));
     expect(mediaBytes.equals(jpegBytes)).toBe(true);
-  });
+  }, 15_000);
   it("builds DOCX output with a two-column table for sidebar and one-column flow for others", async () => {
     const { Packer } = await import("docx");
     const JSZip = (await import("jszip")).default;

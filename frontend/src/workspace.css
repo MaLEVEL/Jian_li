@@ -29,12 +29,11 @@
 .main-stage { display: grid; align-content: start; gap: 28px; min-width: 0; max-width: 1408px; padding: 36px 24px 64px; margin: 0 auto; scroll-margin-top: var(--site-header-offset, 158px); }
 .main-stage:focus:not(:focus-visible) { outline: none; }
 .main-stage:focus-visible { outline: 3px solid #07547e; outline-offset: -3px; }
-.data-settings__help { margin: 0 0 12px; padding: 4px 6px 14px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 13px; line-height: 1.7; }
 .workspace-conflict { display: grid; gap: 8px; margin: 0 0 14px; padding: 14px; border: 1px solid color-mix(in srgb, #b56d22 35%, var(--line)); border-radius: 10px; background: #fff8eb; color: #603d17; }
 .workspace-conflict strong { font-size: 14px; }
 .workspace-conflict p { margin: 0; font-size: 13px; line-height: 1.65; }
 .workspace-conflict__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
-.workspace-conflict__actions button { min-height: 42px; }
+.workspace-conflict__actions button { min-height: 44px; }
 
 .builder-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; min-width: 0; overflow-wrap: anywhere; }
 .builder-controls { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) auto; gap: 18px; align-items: start; min-width: 0; padding: 24px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); overflow-wrap: anywhere; }

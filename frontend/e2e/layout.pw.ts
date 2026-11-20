@@ -345,7 +345,7 @@ test('upload notice updates a polite live status region', async ({ page }) => {
     await page.route('**/api/parse/resume', async (route) => {
       parseRequestCount += 1;
       expect(route.request().postDataBuffer()?.length).toBeGreaterThan(0);
-      await new Promise((resolve) => setTimeout(resolve, 350));
+      await new Promise((resolve) => setTimeout(resolve, 1_200));
       await route.fulfill({ json: { text: '王上传\nwang@example.com\n项目经历\n使用 FastAPI 完成简历解析服务。', filename: 'uploaded-resume.txt' } });
     });
     const fileChooser = page.waitForEvent('filechooser');
@@ -464,7 +464,6 @@ test('dirty local workspace is preserved when another device has a newer revisio
   await page.goto('/');
   await expect(page.locator('.workspace-loading')).toBeHidden({ timeout: 10_000 });
   await expect(page.locator('.header-person strong')).toHaveText('设备 B 的离线修改');
-  await page.getByText('数据设置', { exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('发现另一台设备的更新');
   await expect(page.getByRole('alert')).toContainText('当前浏览器中的修改没有丢失');
 });
@@ -689,11 +688,10 @@ test('opportunity center exposes BOSS inbox and local API settings', async ({ pa
   await page.getByRole('tab', { name: /BOSS 职位收件箱/ }).click();
   await expect(page.getByRole('heading', { name: '收到的 BOSS 岗位', exact: true })).toBeVisible();
 
-  await page.getByLabel('数据设置').click();
-  await expect(page.getByText('数据导入和导出已放到对应页面')).toBeVisible();
-  await expect(page.getByRole('button', { name: '导出数据备份' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '导入数据备份' })).toHaveCount(0);
-  await page.getByRole('button', { name: 'API 接入配置' }).click();
+  await expect(page.getByText('数据设置', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('清空简历与投递', { exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'AI 服务配置', exact: true }).click();
+  await expect(page.getByLabel('请求地址', { exact: true })).toBeVisible();
   await expect(page.getByLabel('请求地址', { exact: true })).toHaveValue('https://open.bigmodel.cn/api/paas/v4');
   await expect(page.getByPlaceholder('仅保存在当前浏览器')).toHaveAttribute('type', 'password');
   await page.getByLabel('请求地址', { exact: true }).fill('https://api.example.com/v1');
@@ -701,8 +699,7 @@ test('opportunity center exposes BOSS inbox and local API settings', async ({ pa
   await page.getByRole('button', { name: '保存到当前浏览器', exact: true }).click();
   await page.reload();
   await page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '机会中心', exact: true }).click();
-  await page.getByLabel('数据设置').click();
-  await page.getByRole('button', { name: 'API 接入配置' }).click();
+  await page.getByRole('button', { name: 'AI 服务配置', exact: true }).click();
   await expect(page.getByLabel('请求地址', { exact: true })).toHaveValue('https://api.example.com/v1');
   expect(await page.getByPlaceholder('仅保存在当前浏览器').inputValue()).toBe('local-only-key');
 });
@@ -828,10 +825,7 @@ for (const width of [390, 320]) {
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 
-    await toggle.click();
-    await navigation.getByRole('button', { name: '更多任务', exact: true }).click();
-    await expect(navigation.getByRole('button', { name: 'API 配置', exact: true })).toBeVisible();
-    await navigation.getByRole('button', { name: 'API 配置', exact: true }).click();
+    await page.getByRole('button', { name: 'AI 服务配置', exact: true }).click();
     await expect(page.getByLabel('请求地址', { exact: true })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   });
