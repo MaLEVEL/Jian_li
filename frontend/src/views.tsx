@@ -27,8 +27,9 @@ import {
 } from "lucide-react";
 import { ChangeEvent, CSSProperties, FormEvent, useMemo, useRef, useState } from "react";
 import { agentApi } from "./agentApi";
-import { RESUME_ACCENT_OPTIONS, RESUME_FONT_OPTIONS, getResumeFontOption, getResumeTemplateDefinition, isSidebarResumeLayout } from "./templateCatalog";
+import { RESUME_ACCENT_OPTIONS, RESUME_FONT_OPTIONS, getResumeFontOption, getResumeTemplateDefinition, isCenteredResumeHeader, isSidebarResumeLayout } from "./templateCatalog";
 import { RESUME_TEMPLATE_OPTIONS, STATUS_OPTIONS } from "./constants";
+import { createResumePhotoDataUrl, getResumePhotoDataUrl, normalizeResumePhotoPosition } from "./resumePhoto";
 import { EmptyState, Field, MetricCard, PanelTitle, TextArea } from "./components";
 import { TodayBoard, type TodayBoardInterview, type TodayBoardOpportunity, type TodayBoardTask } from "./components/TodayBoard";
 import {
@@ -405,12 +406,36 @@ export function BuilderView({
     if (!selectedResume || !selectedAppearance) return;
     onUpdateResume(selectedResume.id, { appearance: { ...selectedAppearance, ...patch } });
   };
+  const selectedPhotoDataUrl = getResumePhotoDataUrl(selectedAppearance?.photoDataUrl);
+  const selectedPhotoPosition = normalizeResumePhotoPosition(selectedAppearance?.photoPosition);
+  const [photoProcessing, setPhotoProcessing] = useState(false);
+  const [photoNotice, setPhotoNotice] = useState("");
   const [activePane, setActivePane] = useState<"editor" | "preview">("editor");
   const [managerOpen, setManagerOpen] = useState(!selectedResume);
   const [resumeUploading, setResumeUploading] = useState(false);
   const [resumeUploadNotice, setResumeUploadNotice] = useState("");
   const versionManagerRef = useRef<HTMLDetailsElement>(null);
   const importTitleRef = useRef<HTMLInputElement>(null);
+
+  async function handleResumePhotoUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+    if (!file || photoProcessing) return;
+    setPhotoProcessing(true);
+    setPhotoNotice("正在居中裁切、清除 EXIF 并压缩为 150 KB 以内的 JPEG…");
+    try {
+      const photoDataUrl = await createResumePhotoDataUrl(file);
+      updateAppearance({
+        photoDataUrl,
+        photoPosition: selectedPhotoPosition,
+      });
+      setPhotoNotice("照片已处理为 3:4 JPEG，仅保存在当前简历版本。");
+    } catch (error) {
+      setPhotoNotice(error instanceof Error ? error.message : "照片处理失败，请换一张 JPG、PNG 或 WebP 图片。");
+    } finally {
+      setPhotoProcessing(false);
+    }
+  }
 
   async function handleResumeFileUpload(event: ChangeEvent<HTMLInputElement>) {
     if (resumeUploading) return;
@@ -507,6 +532,67 @@ export function BuilderView({
                       {RESUME_ACCENT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                     </select>
                   </label>
+                  <div className="resume-photo-control" aria-busy={photoProcessing}>
+                    <div className="resume-photo-control__preview">
+                      {selectedPhotoDataUrl
+                        ? <img src={selectedPhotoDataUrl} alt="当前简历照片预览" />
+                        : <span>3:4</span>}
+                    </div>
+                    <div className="resume-photo-control__body">
+                      <div>
+                        <strong>简历照片</strong>
+                        <small>仅接受本地 JPG、PNG、WebP；居中裁切为 3:4 并压缩为 150 KB 以内 JPEG。</small>
+                      </div>
+                      <div className="resume-photo-control__actions">
+                        <label
+                          className="secondary-button file-button resume-photo-upload"
+                          aria-disabled={photoProcessing}
+                          onClick={(event) => {
+                            if (photoProcessing) event.preventDefault();
+                          }}
+                        >
+                          <Upload size={17} />
+                          {photoProcessing ? "处理中…" : selectedPhotoDataUrl ? "更换照片" : "上传照片"}
+                          <input
+                            type="file"
+                            accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                            aria-label={selectedPhotoDataUrl ? "更换简历照片" : "上传简历照片"}
+                            disabled={photoProcessing}
+                            onChange={(event) => void handleResumePhotoUpload(event)}
+                          />
+                        </label>
+                        {selectedPhotoDataUrl ? (
+                          <button
+                            className="ghost-button"
+                            type="button"
+                            disabled={photoProcessing}
+                            onClick={() => {
+                              updateAppearance({ photoDataUrl: undefined });
+                              setPhotoNotice("已从当前简历版本移除照片。");
+                            }}
+                          >
+                            <Trash2 size={16} />
+                            移除
+                          </button>
+                        ) : null}
+                        <label className="resume-photo-position" htmlFor="resume-photo-position">
+                          <span>位置</span>
+                          <select
+                            id="resume-photo-position"
+                            value={selectedPhotoPosition}
+                            disabled={!selectedPhotoDataUrl || photoProcessing}
+                            onChange={(event) => updateAppearance({ photoPosition: normalizeResumePhotoPosition(event.currentTarget.value) })}
+                          >
+                            <option value="left">左上</option>
+                            <option value="right">右上</option>
+                          </select>
+                        </label>
+                      </div>
+                      <small className="resume-photo-control__status" role="status" aria-live="polite">
+                        {photoNotice || (selectedPhotoDataUrl ? "照片随当前版本保存，切换模板时保留。" : "未添加照片。")}
+                      </small>
+                    </div>
+                  </div>
                 </div>
               ) : null}
             </details>
@@ -1384,6 +1470,16 @@ function ResumePaper({ profile, resume }: { profile: CandidateProfile; resume: R
   const template = getResumeTemplateDefinition(resume.template);
   const appearance = resolveResumeAppearance(resume);
   const font = getResumeFontOption(appearance.fontFamily);
+  const photoDataUrl = getResumePhotoDataUrl(appearance.photoDataUrl);
+  const photoPosition = normalizeResumePhotoPosition(appearance.photoPosition);
+  const centeredHeader = isCenteredResumeHeader(template.layout);
+  const twoColumnLayout = isSidebarResumeLayout(template.layout);
+  const headerClass = [
+    "resume-header",
+    centeredHeader ? "resume-header--centered" : "",
+    photoDataUrl ? "resume-header--has-photo" : "",
+    photoDataUrl ? `resume-header--photo-${photoPosition}` : "",
+  ].filter(Boolean).join(" ");
   const sidebarIds = new Set(["skills", "education", "awards"]);
   const renderSection = (section: (typeof sections)[number]) => (
     <ResumeSection id={section.id} items={section.items} key={section.id} title={section.title} />
@@ -1393,6 +1489,9 @@ function ResumePaper({ profile, resume }: { profile: CandidateProfile; resume: R
       className={`resume-paper resume-paper--${resume.template}`}
       data-layout={template.layout}
       data-page-count={appearance.pageCount}
+      data-centered-header={centeredHeader ? "true" : "false"}
+      data-two-column={twoColumnLayout ? "true" : "false"}
+      data-photo-position={photoPosition}
       style={{
         "--resume-accent": appearance.accent ?? template.accent,
         "--resume-font-family": font.stack,
@@ -1402,11 +1501,15 @@ function ResumePaper({ profile, resume }: { profile: CandidateProfile; resume: R
         "--resume-page-min-height": appearance.pageCount === 1 ? "297mm" : "594mm",
       } as CSSProperties}
     >
-      <header>
-        <h2>{identity.name || "未命名候选人"}</h2>
-        {contact ? <p>{contact}</p> : null}
+      <header className={headerClass}>
+        {photoDataUrl && photoPosition === "left" ? <img className="resume-photo" src={photoDataUrl} alt={`${identity.name || "求职者"}的照片`} data-photo-position={photoPosition} /> : null}
+        <div className="resume-header__identity">
+          <h2>{identity.name || "未命名候选人"}</h2>
+          {contact ? <p>{contact}</p> : null}
+        </div>
+        {photoDataUrl && photoPosition === "right" ? <img className="resume-photo" src={photoDataUrl} alt={`${identity.name || "求职者"}的照片`} data-photo-position={photoPosition} /> : null}
       </header>
-      {isSidebarResumeLayout(template.layout) ? (
+      {twoColumnLayout ? (
         <>
           <div className="resume-sidebar">{sections.filter((section) => sidebarIds.has(section.id)).map(renderSection)}</div>
           <div className="resume-main">{sections.filter((section) => !sidebarIds.has(section.id)).map(renderSection)}</div>

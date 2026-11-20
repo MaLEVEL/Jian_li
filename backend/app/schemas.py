@@ -1,9 +1,13 @@
+import base64
+import binascii
 import json
 import re
 from datetime import datetime
+from io import BytesIO
 from typing import Annotated, Any, Literal
 from urllib.parse import parse_qsl, urlsplit
 
+from PIL import Image, UnidentifiedImageError
 from pydantic import (
     AnyHttpUrl,
     BaseModel,
@@ -213,6 +217,11 @@ class BossJobImportResult(BaseModel):
 
 
 WORKSPACE_MAX_STATE_BYTES = 2 * 1024 * 1024
+WORKSPACE_MAX_PHOTO_CHARS = 210_000
+WORKSPACE_MAX_PHOTO_BYTES = 150 * 1024
+WORKSPACE_MAX_TOTAL_PHOTO_CHARS = 1_200_000
+_RESUME_PHOTO_DATA_URL = re.compile(r'^data:image/jpeg;base64,([A-Za-z0-9+/]+={0,2})$')
+ResumePhotoPosition = Literal['left', 'right']
 _WORKSPACE_PROVIDER_KEY_PARTS = ('apikey', 'baseurl', 'apitoken', 'accesstoken')
 _WORKSPACE_PROVIDER_KEYS = {'authorization', 'bearer', 'llmmode', 'apiendpoint', 'providercredentials'}
 _WORKSPACE_SECRET_VALUE = re.compile(r'(?i)(?:\bsk-[a-z0-9_-]{8,}|\bbearer\s+[a-z0-9._-]{12,}|\b[a-z0-9_-]{20,}\.[a-z0-9_-]{10,}\b)')
@@ -288,6 +297,71 @@ class WorkspaceResumeSections(WorkspaceModel):
     awards: list[str] = Field(max_length=200)
 
 
+def _validate_jpeg_photo(data: bytes) -> tuple[int, int]:
+    if len(data) < 32 or data[:3] != b'\xff\xd8\xff' or data[-2:] != b'\xff\xd9':
+        raise ValueError('照片必须是完整的 JPEG 数据')
+    position = 2
+    dimensions: tuple[int, int] | None = None
+    sof_markers = {
+        0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7,
+        0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF,
+    }
+    while position < len(data) - 2:
+        if data[position] != 0xFF:
+            raise ValueError('JPEG 段结构不合法')
+        while position < len(data) and data[position] == 0xFF:
+            position += 1
+        if position >= len(data):
+            break
+        marker = data[position]
+        position += 1
+        if marker in (0x00, 0xD8, 0xD9) or 0xD0 <= marker <= 0xD7:
+            continue
+        if position + 2 > len(data):
+            raise ValueError('JPEG 段长度不完整')
+        segment_length = int.from_bytes(data[position:position + 2], 'big')
+        if segment_length < 2 or position + segment_length > len(data):
+            raise ValueError('JPEG 段长度不合法')
+        segment = data[position + 2:position + segment_length]
+        if marker == 0xE1:
+            raise ValueError('照片不能包含 EXIF/XMP 元数据')
+        if marker in sof_markers:
+            if len(segment) < 5:
+                raise ValueError('JPEG 尺寸信息不完整')
+            height = int.from_bytes(segment[1:3], 'big')
+            width = int.from_bytes(segment[3:5], 'big')
+            dimensions = (width, height)
+        if marker == 0xDA:
+            entropy_bytes = len(data) - (position + segment_length) - 2
+            if entropy_bytes < 64:
+                raise ValueError('JPEG 图像扫描数据不完整')
+            break
+        position += segment_length
+    if dimensions is None:
+        raise ValueError('JPEG 缺少尺寸信息')
+    width, height = dimensions
+    if width < 180 or height < 240 or width > 3000 or height > 3000:
+        raise ValueError('照片尺寸必须在 180x240 到 3000x3000 之间')
+    if abs(width * 4 - height * 3) > max(4, round(height * 0.06)):
+        raise ValueError('照片比例必须接近 3:4')
+    try:
+        with Image.open(BytesIO(data)) as image:
+            if image.format != 'JPEG':
+                raise ValueError('照片必须是 JPEG 数据')
+            image.verify()
+        with Image.open(BytesIO(data)) as image:
+            image.load()
+            if image.size != (width, height):
+                raise ValueError('JPEG 尺寸信息不一致')
+            if image.getexif():
+                raise ValueError('照片不能包含 EXIF/XMP 元数据')
+            if 'exif' in image.info or 'xmp' in image.info:
+                raise ValueError('照片不能包含 EXIF/XMP 元数据')
+    except (UnidentifiedImageError, OSError, SyntaxError, ValueError) as error:
+        raise ValueError('JPEG 无法完整解码') from error
+    return width, height
+
+
 class WorkspaceResumeAppearance(WorkspaceModel):
     fontFamily: Literal['sans', 'serif', 'editorial']
     fontSize: float = Field(ge=1, le=72)
@@ -295,7 +369,34 @@ class WorkspaceResumeAppearance(WorkspaceModel):
     pageMargin: float = Field(ge=0, le=100)
     pageCount: Literal[1, 2]
     accent: str | None = Field(default=None, max_length=100)
+    photoDataUrl: str | None = Field(
+        default=None,
+        max_length=WORKSPACE_MAX_PHOTO_CHARS,
+        exclude_if=lambda value: value is None,
+    )
+    photoPosition: ResumePhotoPosition | None = Field(default=None, exclude_if=lambda value: value is None)
 
+    @field_validator('photoDataUrl')
+    @classmethod
+    def validate_photo_data_url(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        match = _RESUME_PHOTO_DATA_URL.fullmatch(value)
+        if not match:
+            raise ValueError('照片必须是 JPEG data URL')
+        encoded = match.group(1)
+        if len(encoded) % 4:
+            raise ValueError('照片 Base64 长度不合法')
+        try:
+            decoded = base64.b64decode(encoded, validate=True)
+        except (ValueError, binascii.Error) as error:
+            raise ValueError('照片 Base64 不合法') from error
+        if not decoded:
+            raise ValueError('照片内容不能为空')
+        if len(decoded) > WORKSPACE_MAX_PHOTO_BYTES:
+            raise ValueError('照片不能超过 150KB')
+        _validate_jpeg_photo(decoded)
+        return value
 
 class WorkspaceResume(WorkspaceModel):
     id: str = Field(min_length=1, max_length=128)
@@ -464,6 +565,22 @@ class WorkspaceOpportunity(WorkspaceModel):
         default=None,
         exclude_if=lambda value: value is None,
     )
+    sourceKey: str | None = Field(
+        default=None,
+        min_length=8,
+        max_length=256,
+        exclude_if=lambda value: value is None,
+    )
+    blacklistedAt: str | None = Field(
+        default=None,
+        max_length=100,
+        exclude_if=lambda value: value is None,
+    )
+    blacklistReason: str | None = Field(
+        default=None,
+        max_length=1000,
+        exclude_if=lambda value: value is None,
+    )
     channel: str = Field(default='', max_length=300)
     contact: str = Field(default='', max_length=1000)
     notes: str = Field(default='', max_length=100000)
@@ -540,6 +657,13 @@ class WorkspaceState(WorkspaceModel):
     def validate_workspace_state(self):
         if _contains_provider_config(self.model_dump(mode='json')):
             raise ValueError('工作区状态不能包含 provider/API 凭据配置')
+        total_photo_chars = sum(
+            len(resume.appearance.photoDataUrl or '')
+            for resume in self.resumes
+            if resume.appearance
+        )
+        if total_photo_chars > WORKSPACE_MAX_TOTAL_PHOTO_CHARS:
+            raise ValueError('所有简历照片总量超过 1.2M 字符预算')
         serialized = json.dumps(
             self.model_dump(mode='json'), ensure_ascii=False, separators=(',', ':')
         ).encode('utf-8')

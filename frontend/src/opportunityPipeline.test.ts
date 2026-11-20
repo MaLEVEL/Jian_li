@@ -3,15 +3,20 @@ import type { ApplicationRecord, OpportunityRecord, ResumeVersion } from "./type
 import {
   APPROVED_OPPORTUNITY_STAGES,
   calculateFunnelStats,
+  applyCompanyBlacklist,
   createDefaultNextAction,
   createManualOpportunity,
+  createOpportunitySourceKey,
   createOpportunityStableId,
   findSimilarOpportunities,
   generateRuleBasedInterviewPackage,
+  getCompanyBlacklistStates,
   getDefaultNextActionDefinition,
   groupApplicationTasks,
   normalizeOpportunityRecord,
   parseOpportunityCsv,
+  restoreCompanyBlacklist,
+  upsertOpportunity,
 } from "./opportunityPipeline";
 import { createStoredPayload, normalizeStoredState, STORAGE_VERSION } from "./storage";
 
@@ -174,6 +179,162 @@ describe("opportunity model and stable identity", () => {
 
     expect(restored.applications).toHaveLength(0);
     expect(restored.opportunities).toHaveLength(0);
+  });
+});
+
+describe("opportunity source keys, upsert and company blacklist rules", () => {
+  it("uses URL, then source job ID, then the normalized job fallback", () => {
+    const sameUrl = opportunity({
+      id: "opportunity-url-a",
+      source: "boss",
+      sourceJobId: "job-a",
+      sourceUrl: "https://jobs.example.com/roles/1?utm_source=feed&from=card",
+    });
+    const sameUrlWithDifferentCorrection = opportunity({
+      id: "opportunity-url-b",
+      source: "csv",
+      sourceJobId: "job-b",
+      sourceUrl: "https://jobs.example.com/roles/1?from=card&utm_source=feed#apply",
+    });
+    const sameSourceJob = opportunity({
+      id: "opportunity-job-a",
+      source: "boss",
+      sourceJobId: "BOSS-42",
+      sourceUrl: "",
+    });
+    const sameSourceJobWithDifferentDisplay = opportunity({
+      id: "opportunity-job-b",
+      source: "boss",
+      sourceJobId: " boss-42 ",
+      sourceUrl: "",
+      job: { company: "云帆科技集团", title: "AI 产品经理", description: "另一份 JD", location: "上海" },
+    });
+    const fallback = opportunity({
+      id: "opportunity-fallback-a",
+      source: "manual",
+      sourceJobId: "",
+      sourceUrl: "",
+      job: { company: " 云帆 科技 ", title: "AI 产品实习生", description: "旧 JD", location: " 上海 " },
+    });
+    const fallbackAgain = opportunity({
+      id: "opportunity-fallback-b",
+      source: "manual",
+      sourceUrl: "",
+      job: { company: "云帆 科技", title: "ai 产品实习生", description: "新 JD", location: "上海" },
+    });
+    const differentLocation = opportunity({
+      id: "opportunity-fallback-c",
+      source: "manual",
+      sourceUrl: "",
+      job: { company: "云帆 科技", title: "AI 产品实习生", description: "新 JD", location: "北京" },
+    });
+
+    expect(createOpportunitySourceKey(sameUrl)).toBe(createOpportunitySourceKey(sameUrlWithDifferentCorrection));
+    expect(createOpportunitySourceKey(sameSourceJob)).toBe(createOpportunitySourceKey(sameSourceJobWithDifferentDisplay));
+    expect(createOpportunitySourceKey(sameUrl)).not.toBe(createOpportunitySourceKey(sameSourceJob));
+    expect(createOpportunitySourceKey(fallback)).toBe(createOpportunitySourceKey(fallbackAgain));
+    expect(createOpportunitySourceKey(fallback)).not.toBe(createOpportunitySourceKey(differentLocation));
+  });
+
+  it("keeps same company/title/location records separate when no strong source identity exists", () => {
+    const existing = opportunity({
+      id: "opportunity-no-strong-a",
+      source: "manual",
+      sourceUrl: "",
+      sourceJobId: "",
+      job: { company: "云帆科技", title: "AI 产品实习生", description: "项目 A", location: "上海" },
+    });
+    const incoming = opportunity({
+      id: "opportunity-no-strong-b",
+      source: "manual",
+      sourceUrl: "",
+      sourceJobId: "",
+      job: { company: "云帆科技", title: "AI 产品实习生", description: "项目 B，薪资与职级不同", location: "上海" },
+    });
+
+    const merged = upsertOpportunity([existing], incoming);
+
+    expect(merged).toHaveLength(2);
+    expect(merged.map((item) => item.job.description)).toEqual(["项目 A", "项目 B，薪资与职级不同"]);
+  });
+
+  it("upserts duplicate imports while preserving workflow state and taking the newer JD snapshot", () => {
+    const existing = opportunity({
+      id: "opportunity-existing",
+      stage: "saved",
+      source: "boss",
+      sourceJobId: "job-77",
+      sourceUrl: "",
+      notes: "内推人：王女士",
+      nextAction: {
+        id: "action-saved",
+        kind: "review",
+        title: "判断是否投递",
+        dueAt: "2026-11-21T09:00:00+08:00",
+        createdAt: NOW,
+      },
+      updatedAt: "2026-11-19T12:00:00+08:00",
+    });
+    const incoming = opportunity({
+      id: "opportunity-incoming",
+      stage: "new",
+      source: "boss",
+      sourceJobId: "JOB-77",
+      sourceUrl: "https://jobs.example.com/roles/77",
+      job: {
+        company: "云帆科技",
+        title: "AI 产品实习生",
+        description: "更新后的 JD，新增知识库检索与评测要求。",
+        location: "上海",
+      },
+      notes: "",
+      updatedAt: "2026-11-20T12:00:00+08:00",
+      nextAction: undefined,
+    });
+
+    const merged = upsertOpportunity([existing], incoming, { now: "2026-11-20T13:00:00+08:00" });
+
+    expect(merged).toHaveLength(1);
+    expect(merged[0]).toMatchObject({
+      id: "opportunity-existing",
+      stage: "saved",
+      sourceJobId: "job-77",
+      notes: "内推人：王女士",
+      job: { description: "更新后的 JD，新增知识库检索与评测要求。" },
+      nextAction: { id: "action-saved" },
+    });
+    expect(merged[0].updatedAt).toBe("2026-11-20T04:00:00.000Z");
+  });
+
+  it("applies and restores blacklist fields in a batch for the selected company", () => {
+    const selected = opportunity({ id: "opportunity-b", job: { company: "云帆 科技", title: "数据分析实习生", description: "JD 2" } });
+    const companyPeer = opportunity({ id: "opportunity-a", job: { company: "云帆科技", title: "AI 产品实习生", description: "JD 1" } });
+    const otherCompany = opportunity({ id: "opportunity-c", job: { company: "星河科技", title: "产品运营", description: "JD 3" } });
+
+    const blacklisted = applyCompanyBlacklist([selected, companyPeer, otherCompany], selected.id, {
+      now: "2026-11-20T14:00:00+08:00",
+      reason: "岗位方向不匹配",
+    });
+    const states = getCompanyBlacklistStates(blacklisted);
+    const companyKey = [...states.keys()].find((key) => blacklisted.some((record) => record.id === selected.id && record.job.company.replace(/\s/g, "") === key));
+
+    expect(blacklisted.filter((record) => record.id !== otherCompany.id)).toEqual([
+      expect.objectContaining({
+        blacklistedAt: "2026-11-20T06:00:00.000Z",
+        blacklistReason: "岗位方向不匹配",
+      }),
+      expect.objectContaining({
+        blacklistedAt: "2026-11-20T06:00:00.000Z",
+        blacklistReason: "岗位方向不匹配",
+      }),
+    ]);
+    expect(blacklisted[2].blacklistedAt).toBeUndefined();
+    expect(companyKey).toBeDefined();
+    expect(states.get(companyKey!)).toMatchObject({ blacklistReason: "岗位方向不匹配" });
+
+    const restored = restoreCompanyBlacklist(blacklisted, selected.id, { now: "2026-11-20T15:00:00+08:00" });
+    expect(restored.slice(0, 2).every((record) => !record.blacklistedAt && !record.blacklistReason)).toBe(true);
+    expect(restored[2]).toEqual(otherCompany);
   });
 });
 
@@ -426,7 +587,3 @@ describe("storage V1 compatibility", () => {
     expect(restored.opportunities).toEqual([]);
   });
 });
-
-
-
-

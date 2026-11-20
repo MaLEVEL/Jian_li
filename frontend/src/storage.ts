@@ -1,6 +1,6 @@
 import { DEFAULT_PROFILE, RESUME_TEMPLATE_OPTIONS, STATUS_OPTIONS } from "./constants";
 import { createId, renderResumeText, splitLines, splitSkills } from "./resumeLogic";
-import { createManualOpportunity, normalizeOpportunityRecord } from "./opportunityPipeline";
+import { createManualOpportunity, dedupeOpportunities, normalizeOpportunityRecord } from "./opportunityPipeline";
 import { getResumeAppearanceDefaults, getResumeTemplateDefinition } from "./templateCatalog";
 import type {
   ApplicationRecord,
@@ -142,6 +142,12 @@ function coerceResumeAppearance(
       ? rawFontFamily
       : defaults.fontFamily;
 
+  const rawPhoto = coerceString(record.photoDataUrl);
+  const photoDataUrl =
+    /^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(rawPhoto) && rawPhoto.length <= 210_000
+      ? rawPhoto
+      : undefined;
+  const photoPosition = record.photoPosition === "left" ? "left" : "right";
   return {
     fontFamily,
     fontSize: Math.round(clampNumber(record.fontSize, defaults.fontSize, 10.5, 16) * 2) / 2,
@@ -149,6 +155,7 @@ function coerceResumeAppearance(
     pageMargin: Math.round(clampNumber(record.pageMargin, defaults.pageMargin, 12, 24)),
     pageCount: Number(record.pageCount) === 2 ? 2 : 1,
     accent: coerceAccent(record.accent, defaults.accent),
+    ...(photoDataUrl ? { photoDataUrl, photoPosition } : {}),
   };
 }
 function coerceResumeIdentity(value: unknown): ResumeIdentity | undefined {
@@ -365,11 +372,13 @@ export function normalizeStoredState(value: unknown): StoredState {
           resumeTitle: resumeById.get(application.resumeId)?.title ?? application.resumeTitle,
         }))
     : [];
-  const opportunities = Array.isArray(value.opportunities)
-    ? value.opportunities
-        .map((opportunity) => normalizeOpportunityRecord(opportunity))
-        .filter((opportunity): opportunity is OpportunityRecord => Boolean(opportunity))
-    : createLegacyOpportunities(applications);
+  const opportunities = dedupeOpportunities(
+    Array.isArray(value.opportunities)
+      ? value.opportunities
+          .map((opportunity) => normalizeOpportunityRecord(opportunity))
+          .filter((opportunity): opportunity is OpportunityRecord => Boolean(opportunity))
+      : createLegacyOpportunities(applications),
+  );
 
   const jobPool = coerceJobPool(value.jobPool);
   return { profile, resumes, applications, opportunities, jobPool };
@@ -398,7 +407,7 @@ export function createStoredPayload(
     profile,
     resumes,
     applications,
-    opportunities,
+    opportunities: dedupeOpportunities(opportunities),
     jobPool: coerceJobPool(jobPool),
   };
 }

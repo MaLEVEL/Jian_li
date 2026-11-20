@@ -1,4 +1,6 @@
+import base64
 import json
+from pathlib import Path
 
 import pytest
 from app.config import DEFAULT_EXTENSION_ORIGIN, Settings
@@ -490,3 +492,164 @@ def test_stable_chrome_extension_origin_is_allowed(client):
 
     assert response.status_code == 200
     assert response.headers['access-control-allow-origin'] == DEFAULT_EXTENSION_ORIGIN
+
+
+def portrait_jpeg():
+    return (Path(__file__).parent / 'fixtures' / 'portrait.jpg').read_bytes()
+
+
+def photo_data_url(data: bytes) -> str:
+    encoded = base64.b64encode(data).decode('ascii')
+    return 'data:image/jpeg;base64,' + encoded
+
+
+def jpeg_without_entropy_data() -> bytes:
+    data = portrait_jpeg()
+    sos = data.index(b'\xff\xda')
+    length = int.from_bytes(data[sos + 2:sos + 4], 'big')
+    return data[:sos + 2 + length] + b'\xff\xd9'
+
+
+def padded_portrait_jpeg(target_bytes: int) -> bytes:
+    data = portrait_jpeg()
+    padding = target_bytes - len(data)
+    segments: list[bytes] = []
+    while padding >= 4:
+        payload_size = min(65000, padding - 4)
+        segments.append(b'\xff\xfe' + (payload_size + 2).to_bytes(2, 'big') + b'\x00' * payload_size)
+        padding -= payload_size + 4
+    return data[:2] + b''.join(segments) + data[2:]
+
+
+def test_workspace_accepts_optional_jpeg_resume_photo(client):
+    appearance = {
+        **resume_record()['appearance'],
+        'photoDataUrl': photo_data_url(portrait_jpeg()),
+        'photoPosition': 'left',
+    }
+    state = workspace_state(resumes=[resume_record(appearance=appearance)])
+
+    response = put_workspace(client, state, None)
+
+    assert response.status_code == 200, response.text
+    stored = response.json()['state']['resumes'][0]['appearance']
+    assert stored['photoPosition'] == 'left'
+    assert stored['photoDataUrl'].startswith('data:image/jpeg;base64,')
+
+
+@pytest.mark.parametrize('bad_photo, position', [
+    ('https://example.com/photo.jpg', 'right'),
+    ('data:image/png;base64,iVBORw0KGgo=', 'right'),
+    ('data:image/jpeg;base64,bm90LWpwZWc=', 'right'),
+    ('data:image/jpeg;base64,/9j/', 'center'),
+])
+def test_workspace_rejects_invalid_resume_photo(client, bad_photo, position):
+    appearance = {
+        **resume_record()['appearance'],
+        'photoDataUrl': bad_photo,
+        'photoPosition': position,
+    }
+    state = workspace_state(resumes=[resume_record(appearance=appearance)])
+
+    response = put_workspace(client, state, None)
+
+    assert response.status_code == 422
+
+
+
+def test_workspace_rejects_jpeg_that_cannot_be_decoded(client):
+    appearance = {
+        **resume_record()['appearance'],
+        'photoDataUrl': photo_data_url(jpeg_without_entropy_data()),
+        'photoPosition': 'right',
+    }
+
+    response = put_workspace(
+        client,
+        workspace_state(resumes=[resume_record(appearance=appearance)]),
+        None,
+    )
+
+    assert response.status_code == 422
+
+def test_workspace_rejects_photo_with_exif_metadata(client):
+    data = portrait_jpeg()
+    with_exif = b'\xff\xd8\xff\xe1\x00\x08Exif\x00\x00' + data[2:]
+    appearance = {
+        **resume_record()['appearance'],
+        'photoDataUrl': photo_data_url(with_exif),
+        'photoPosition': 'right',
+    }
+
+    response = put_workspace(
+        client,
+        workspace_state(resumes=[resume_record(appearance=appearance)]),
+        None,
+    )
+
+    assert response.status_code == 422
+
+
+
+def test_workspace_rejects_photo_over_150kb(client):
+    appearance = {
+        **resume_record()['appearance'],
+        'photoDataUrl': photo_data_url(padded_portrait_jpeg(150 * 1024 + 1)),
+        'photoPosition': 'right',
+    }
+
+    response = put_workspace(
+        client,
+        workspace_state(resumes=[resume_record(appearance=appearance)]),
+        None,
+    )
+
+    assert response.status_code == 422
+
+def test_workspace_allows_four_copied_photo_versions_within_total_budget(client):
+    photo = photo_data_url(padded_portrait_jpeg(150 * 1024))
+    appearance = {
+        **resume_record()['appearance'],
+        'photoDataUrl': photo,
+        'photoPosition': 'right',
+    }
+    resumes = [
+        resume_record(id=f'resume-{index}', appearance=appearance)
+        for index in range(4)
+    ]
+
+    response = put_workspace(client, workspace_state(resumes=resumes), None)
+
+    assert response.status_code == 200, response.text
+    assert len(response.json()['state']['resumes']) == 4
+
+
+def test_workspace_accepts_opportunity_dedup_and_blacklist_fields(client):
+    state = workspace_state(opportunities=[opportunity_record(
+        sourceKey='boss:company:role:shanghai',
+        blacklistedAt='2026-11-20T10:00:00.000Z',
+        blacklistReason='明确不匹配，不再投递',
+    )])
+
+    response = put_workspace(client, state, None)
+
+    assert response.status_code == 200, response.text
+    stored = response.json()['state']['opportunities'][0]
+    assert stored['sourceKey'] == 'boss:company:role:shanghai'
+    assert stored['blacklistReason'] == '明确不匹配，不再投递'
+
+
+def test_workspace_omits_empty_photo_and_blacklist_fields_for_legacy_payloads(client):
+    state = workspace_state(
+        resumes=[resume_record()],
+        opportunities=[opportunity_record()],
+    )
+
+    response = put_workspace(client, state, None)
+
+    assert response.status_code == 200, response.text
+    stored = response.json()['state']
+    assert 'photoDataUrl' not in stored['resumes'][0]['appearance']
+    assert 'photoPosition' not in stored['resumes'][0]['appearance']
+    assert 'sourceKey' not in stored['opportunities'][0]
+    assert 'blacklistedAt' not in stored['opportunities'][0]

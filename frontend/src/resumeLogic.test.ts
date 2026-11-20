@@ -7,8 +7,11 @@ import {
   extractResumeIdentityFromText,
   extractResumeTargetRoleFromText,
   getResumeIdentity,
+  inheritResumeAppearance,
   inspectResumeQuality,
   optimizeResume,
+  renderResumeText,
+  resolveResumeAppearance,
 } from "./resumeLogic";
 import type { ResumeVersion } from "./types";
 
@@ -99,6 +102,32 @@ describe("resume logic", () => {
     expect(optimized.skills.slice(0, 3)).toEqual(expect.arrayContaining(["React", "TypeScript", "Vite"]));
   });
 
+  it("keeps photo appearance out of resume text, AI matching input, and optimized sections", () => {
+    const photoDataUrl = "data:image/jpeg;base64,/9j/2Q==";
+    const resumeWithPhoto: ResumeVersion = {
+      ...baseResume,
+      appearance: {
+        fontFamily: "sans",
+        fontSize: 12,
+        lineHeight: 1.55,
+        pageMargin: 16,
+        pageCount: 1,
+        photoDataUrl,
+        photoPosition: "left",
+      },
+    };
+    const plainText = renderResumeText(DEFAULT_PROFILE, resumeWithPhoto.sections);
+    const job = { company: "云帆科技", title: "Frontend Engineer", description: "React TypeScript" };
+    const report = analyzeMatch(plainText, job.description, resumeWithPhoto.sections);
+    const optimized = optimizeResume(DEFAULT_PROFILE, resumeWithPhoto, job, report);
+
+    expect(plainText).not.toContain("data:image/jpeg");
+    expect(resolveResumeAppearance(resumeWithPhoto)).toMatchObject({ photoDataUrl, photoPosition: "left" });
+    const inheritedAppearance = inheritResumeAppearance(resumeWithPhoto);
+    expect(inheritedAppearance).toEqual(resumeWithPhoto.appearance);
+    expect(inheritedAppearance).not.toBe(resumeWithPhoto.appearance);
+    expect(JSON.stringify(optimized)).not.toContain("data:image/jpeg");
+  });
   it("checks resume quality for quantification and one-page readability", () => {
     const report = inspectResumeQuality({
       ...baseResume,

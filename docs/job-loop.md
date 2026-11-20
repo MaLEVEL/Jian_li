@@ -70,7 +70,9 @@ company,title,description
 location,source,stage,nextAction,nextActionAt,channel,contact,notes,url
 ```
 
-CSV 会先预览，有效行确认后写入；无效行不会被导入。相似岗位只提示重复，不会自动删除或覆盖状态。
+CSV 会先预览，有效行确认后写入；无效行不会被导入。重复岗位优先按规范化来源链接、平台岗位 ID 识别，缺少强标识时按来源、公司、岗位和城市合并；已有阶段和下一步会保留，新 JD 快照可以更新。
+
+同公司的机会可批量加入黑名单，默认从列表、今日驾驶舱和提醒任务中隐藏；在机会页打开“显示黑名单”可查看原因并整家公司恢复。
 
 ## 4. BOSS 职位收件箱
 

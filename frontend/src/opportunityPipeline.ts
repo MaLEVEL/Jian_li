@@ -100,6 +100,8 @@ export interface OpportunityCreateOptions {
 }
 
 export interface StableOpportunityIdentityInput {
+  source?: OpportunitySource | string;
+  sourceJobId?: string;
   company?: string;
   title?: string;
   location?: string;
@@ -110,6 +112,22 @@ export interface StableOpportunityIdentityInput {
     location?: string;
   };
   sourceUrl?: string;
+}
+
+export interface OpportunityCompanyBlacklistState {
+  companyKey: string;
+  blacklistedAt: string;
+  blacklistReason: string;
+  sourceOpportunityId: string;
+}
+
+export interface OpportunityUpsertOptions {
+  now?: string | Date;
+}
+
+export interface OpportunityBlacklistOptions {
+  now?: string | Date;
+  reason?: string;
 }
 
 export interface OpportunityCsvPreviewError {
@@ -308,6 +326,12 @@ export function normalizeOpportunityUrl(value: string): string {
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return "";
     if (parsed.username || parsed.password) return "";
     parsed.hash = "";
+    const trackingKeys = [...parsed.searchParams.keys()].filter((key) => {
+      const normalized = key.toLowerCase();
+      return normalized.startsWith("utm_") || normalized === "from" || normalized === "spm";
+    });
+    trackingKeys.forEach((key) => parsed.searchParams.delete(key));
+    parsed.searchParams.sort();
     return parsed.toString();
   } catch {
     return "";
@@ -342,6 +366,36 @@ export function createOpportunityStableId(
   input: StableOpportunityIdentityInput,
 ): string {
   return `opportunity-${fnv1a(stableIdentityParts(source, input))}`;
+}
+
+export function createOpportunitySourceKey(
+  record: Pick<OpportunityRecord, "source" | "sourceJobId" | "sourceUrl" | "job">,
+): string;
+export function createOpportunitySourceKey(
+  source: OpportunitySource | string,
+  input?: StableOpportunityIdentityInput,
+): string;
+export function createOpportunitySourceKey(
+  sourceOrRecord: OpportunitySource | string | Pick<OpportunityRecord, "source" | "sourceJobId" | "sourceUrl" | "job">,
+  input: StableOpportunityIdentityInput = {},
+): string {
+  const record = typeof sourceOrRecord === "string" ? undefined : sourceOrRecord;
+  const source = normalizedIdentityText(record?.source ?? input.source ?? (typeof sourceOrRecord === "string" ? sourceOrRecord : ""));
+  const job = record?.job ?? input.job ?? {};
+  const sourceUrlRaw = cleanText(record?.sourceUrl ?? input.sourceUrl ?? input.url);
+  const sourceUrl = sourceUrlRaw ? normalizeOpportunityUrl(sourceUrlRaw) || normalizedIdentityText(sourceUrlRaw) : "";
+  if (sourceUrl) return `source-url:${fnv1a(sourceUrl)}`;
+
+  const sourceJobId = normalizedIdentityText(record?.sourceJobId ?? input.sourceJobId);
+  if (sourceJobId) return `source-job:${fnv1a(`${source}\u001f${sourceJobId}`)}`;
+
+  const fallback = [
+    source || "unknown",
+    normalizedIdentityText(input.company ?? job.company),
+    normalizedIdentityText(input.title ?? job.title),
+    normalizedIdentityText(input.location ?? job.location),
+  ].join("\u001f");
+  return `job-identity:${fnv1a(fallback)}`;
 }
 
 function actionKindFromText(value: string, stage: OpportunityStage): ApplicationNextActionKind {
@@ -418,6 +472,7 @@ export function createManualOpportunity(
     job,
     source: "manual",
     sourceUrl: sourceUrl || undefined,
+    sourceKey: createOpportunitySourceKey("manual", { job, sourceUrl }),
     applicationId: cleanText(input.applicationId) || undefined,
     resumeId: cleanText(input.resumeId) || undefined,
     channel: cleanText(input.channel),
@@ -490,6 +545,13 @@ export function normalizeOpportunityRecord(
     location: cleanText(jobRecord.location) || undefined,
     salary: cleanText(jobRecord.salary) || undefined,
   };
+  const sourceJobId = cleanText(value.sourceJobId) || undefined;
+  const existingSourceKey = cleanText(value.sourceKey);
+  const sourceKey = (existingSourceKey.length >= 8 ? existingSourceKey : createOpportunitySourceKey(source, {
+    sourceJobId,
+    job,
+    sourceUrl,
+  })).slice(0, 256);
   const fallbackId = createOpportunityStableId(source, { job, sourceUrl });
   const id = cleanText(value.id) || fallbackId;
   const nextAction = normalizeAction(value.nextAction, stage, id, updatedAt);
@@ -500,8 +562,11 @@ export function normalizeOpportunityRecord(
     stage,
     job,
     source,
-    sourceJobId: cleanText(value.sourceJobId) || undefined,
+    sourceJobId,
     sourceUrl: sourceUrl || undefined,
+    sourceKey,
+    blacklistedAt: normalizedDateTime(value.blacklistedAt) || undefined,
+    blacklistReason: cleanText(value.blacklistReason).slice(0, 1000) || undefined,
     applicationId: cleanText(value.applicationId) || undefined,
     resumeId: cleanText(value.resumeId) || undefined,
     channel: cleanText(value.channel),
@@ -821,6 +886,214 @@ export function findSimilarOpportunities(
   });
 }
 
+function normalizedRecordUrl(record: OpportunityRecord): string {
+  return record.sourceUrl ? normalizeOpportunityUrl(record.sourceUrl) : "";
+}
+
+function normalizedRecordSourceJobId(record: OpportunityRecord): string {
+  return normalizedIdentityText(record.sourceJobId);
+}
+
+function recordsRepresentSameOpportunity(left: OpportunityRecord, right: OpportunityRecord): boolean {
+  const leftKey = cleanText(left.sourceKey);
+  const rightKey = cleanText(right.sourceKey);
+  const leftStrongKey = leftKey && !leftKey.startsWith('job-identity:');
+  const rightStrongKey = rightKey && !rightKey.startsWith('job-identity:');
+  if (leftStrongKey && rightStrongKey && leftKey === rightKey) return true;
+
+  const leftUrl = normalizedRecordUrl(left);
+  const rightUrl = normalizedRecordUrl(right);
+  if (leftUrl && rightUrl && leftUrl === rightUrl) return true;
+
+  const leftSourceJobId = normalizedRecordSourceJobId(left);
+  const rightSourceJobId = normalizedRecordSourceJobId(right);
+  if (
+    leftSourceJobId &&
+    rightSourceJobId &&
+    normalizedIdentityText(left.source) === normalizedIdentityText(right.source) &&
+    leftSourceJobId === rightSourceJobId
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+function recordUpdatedTime(record: OpportunityRecord): number {
+  const parsed = parseOpportunityDateTime(record.updatedAt);
+  return parsed?.getTime() ?? 0;
+}
+
+export function mergeOpportunityRecords(
+  existing: OpportunityRecord,
+  incoming: OpportunityRecord,
+  options: OpportunityUpsertOptions = {},
+): OpportunityRecord {
+  const preferred = recordUpdatedTime(incoming) >= recordUpdatedTime(existing) ? incoming : existing;
+  const secondary = preferred === incoming ? existing : incoming;
+  const updatedAt = isoDate(
+    recordUpdatedTime(preferred) ? preferred.updatedAt : options.now,
+    dateValue(existing.updatedAt, new Date(0)),
+  );
+  const createdAtTime = Math.min(
+    parseOpportunityDateTime(existing.createdAt)?.getTime() ?? Number.MAX_SAFE_INTEGER,
+    parseOpportunityDateTime(incoming.createdAt)?.getTime() ?? Number.MAX_SAFE_INTEGER,
+  );
+  const createdAt = createdAtTime === Number.MAX_SAFE_INTEGER
+    ? existing.createdAt
+    : new Date(createdAtTime).toISOString();
+  const sourceJobId = cleanText(existing.sourceJobId) || cleanText(incoming.sourceJobId) || undefined;
+  const sourceUrlRaw = preferred.sourceUrl || secondary.sourceUrl;
+  const sourceUrl = sourceUrlRaw ? normalizeOpportunityUrl(sourceUrlRaw) || undefined : undefined;
+  const sourceKey = cleanText(existing.sourceKey) ||
+    cleanText(incoming.sourceKey) ||
+    createOpportunitySourceKey(preferred.source, { sourceJobId, sourceUrl, job: preferred.job });
+  const blacklistCandidates = [existing, incoming]
+    .filter((record) => record.blacklistedAt || record.blacklistReason)
+    .sort((left, right) => {
+      const leftTime = parseOpportunityDateTime(left.blacklistedAt ?? "")?.getTime() ?? 0;
+      const rightTime = parseOpportunityDateTime(right.blacklistedAt ?? "")?.getTime() ?? 0;
+      return rightTime - leftTime;
+    });
+  const blacklistSnapshot = blacklistCandidates[0];
+  const blacklistedAt = normalizedDateTime(
+    blacklistCandidates.find((record) => record.blacklistedAt)?.blacklistedAt,
+  ) || undefined;
+  const blacklistReason =
+    cleanText(blacklistCandidates.find((record) => record.blacklistReason)?.blacklistReason).slice(0, 1000) ||
+    cleanText(blacklistSnapshot?.blacklistReason).slice(0, 1000) ||
+    undefined;
+
+  return {
+    ...existing,
+    id: existing.id,
+    stage: existing.stage,
+    job: {
+      company: cleanText(existing.job.company) || cleanText(incoming.job.company),
+      title: cleanText(existing.job.title) || cleanText(incoming.job.title),
+      description: cleanText(preferred.job.description) || cleanText(secondary.job.description),
+      location: cleanText(preferred.job.location) || cleanText(secondary.job.location) || undefined,
+      salary: cleanText(preferred.job.salary) || cleanText(secondary.job.salary) || undefined,
+    },
+    source: preferred.source,
+    sourceJobId,
+    sourceUrl,
+    sourceKey: sourceKey.slice(0, 256),
+    blacklistedAt,
+    blacklistReason,
+    applicationId: cleanText(existing.applicationId) || cleanText(incoming.applicationId) || undefined,
+    resumeId: cleanText(existing.resumeId) || cleanText(incoming.resumeId) || undefined,
+    channel: cleanText(existing.channel) || cleanText(incoming.channel),
+    contact: cleanText(existing.contact) || cleanText(incoming.contact),
+    notes: cleanText(existing.notes) || cleanText(incoming.notes),
+    createdAt,
+    updatedAt,
+    stageChangedAt: existing.stageChangedAt || incoming.stageChangedAt || updatedAt,
+    nextAction: existing.nextAction ?? incoming.nextAction,
+  };
+}
+
+export function upsertOpportunity(
+  opportunities: OpportunityRecord[],
+  incoming: OpportunityRecord,
+  options: OpportunityUpsertOptions = {},
+): OpportunityRecord[] {
+  const existingIndex = opportunities.findIndex((existing) => recordsRepresentSameOpportunity(existing, incoming));
+  const sourceKey = cleanText(incoming.sourceKey) ||
+    createOpportunitySourceKey(incoming).slice(0, 256);
+  const normalizedIncoming = { ...incoming, sourceKey };
+  if (existingIndex < 0) return [...opportunities, normalizedIncoming];
+  const updated = [...opportunities];
+  updated[existingIndex] = mergeOpportunityRecords(updated[existingIndex], normalizedIncoming, options);
+  return updated;
+}
+
+export function dedupeOpportunities(
+  opportunities: OpportunityRecord[],
+  options: OpportunityUpsertOptions = {},
+): OpportunityRecord[] {
+  return opportunities.reduce<OpportunityRecord[]>(
+    (unique, opportunity) => upsertOpportunity(unique, opportunity, options),
+    [],
+  );
+}
+
+export function createOpportunityCompanyKey(company: string): string {
+  return normalizedIdentityText(company);
+}
+
+export function getCompanyBlacklistStates(
+  opportunities: OpportunityRecord[],
+): Map<string, OpportunityCompanyBlacklistState> {
+  const states = new Map<string, OpportunityCompanyBlacklistState>();
+  opportunities.forEach((opportunity) => {
+    if (!opportunity.blacklistedAt && !opportunity.blacklistReason) return;
+    const companyKey = createOpportunityCompanyKey(opportunity.job.company);
+    if (!companyKey) return;
+    const blacklistedAt = normalizedDateTime(opportunity.blacklistedAt) || cleanText(opportunity.blacklistedAt);
+    const blacklistReason = cleanText(opportunity.blacklistReason).slice(0, 1000);
+    const current = states.get(companyKey);
+    if (!current) {
+      states.set(companyKey, {
+        companyKey,
+        blacklistedAt,
+        blacklistReason,
+        sourceOpportunityId: opportunity.id,
+      });
+      return;
+    }
+    const currentTime = parseOpportunityDateTime(current.blacklistedAt)?.getTime() ?? 0;
+    const candidateTime = parseOpportunityDateTime(blacklistedAt)?.getTime() ?? 0;
+    states.set(companyKey, {
+      companyKey,
+      blacklistedAt: candidateTime > currentTime ? blacklistedAt : current.blacklistedAt,
+      blacklistReason: blacklistReason || current.blacklistReason,
+      sourceOpportunityId:
+        candidateTime > currentTime ? opportunity.id : current.sourceOpportunityId,
+    });
+  });
+  return states;
+}
+
+export function applyCompanyBlacklist(
+  opportunities: OpportunityRecord[],
+  selectedOpportunityId: string,
+  options: OpportunityBlacklistOptions = {},
+): OpportunityRecord[] {
+  const selected = opportunities.find((opportunity) => opportunity.id === selectedOpportunityId);
+  if (!selected) return [...opportunities];
+  const companyKey = createOpportunityCompanyKey(selected.job.company);
+  const blacklistedAt = isoDate(options.now);
+  const blacklistReason = cleanText(options.reason).slice(0, 1000) || "同公司机会已拉黑";
+  return opportunities.map((opportunity) => {
+    if (createOpportunityCompanyKey(opportunity.job.company) !== companyKey) return opportunity;
+    return {
+      ...opportunity,
+      blacklistedAt,
+      blacklistReason,
+      updatedAt: blacklistedAt,
+    };
+  });
+}
+
+export function restoreCompanyBlacklist(
+  opportunities: OpportunityRecord[],
+  selectedOpportunityId: string,
+  options: Pick<OpportunityBlacklistOptions, "now"> = {},
+): OpportunityRecord[] {
+  const selected = opportunities.find((opportunity) => opportunity.id === selectedOpportunityId);
+  if (!selected) return [...opportunities];
+  const companyKey = createOpportunityCompanyKey(selected.job.company);
+  const updatedAt = isoDate(options.now);
+  return opportunities.map((opportunity) => {
+    if (createOpportunityCompanyKey(opportunity.job.company) !== companyKey) return opportunity;
+    const restored = { ...opportunity, updatedAt };
+    delete restored.blacklistedAt;
+    delete restored.blacklistReason;
+    return restored;
+  });
+}
+
 export function calculateFunnelStats(
   opportunities: OpportunityRecord[],
   now: string | Date = new Date(),
@@ -963,5 +1236,3 @@ export function generateRuleBasedInterviewPackage(
     riskReminders,
   };
 }
-
-

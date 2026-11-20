@@ -1,6 +1,7 @@
 import type { Document as DocxDocument, Paragraph as DocxParagraph, Table as DocxTable } from "docx";
 import { KEYWORD_BANK } from "./constants";
-import { getResumeAppearanceDefaults, getResumeFontOption, getResumeSectionOrder, getResumeTemplateDefinition, isSidebarResumeLayout } from "./templateCatalog";
+import { getResumeAppearanceDefaults, getResumeFontOption, getResumeSectionOrder, getResumeTemplateDefinition, isCenteredResumeHeader, isSidebarResumeLayout } from "./templateCatalog";
+import { getResumePhotoDataUrl, normalizeResumePhotoPosition, parseJpegDataUrl } from "./resumePhoto";
 import type {
   CandidateProfile,
   InterviewQuestions,
@@ -22,6 +23,7 @@ export function resolveResumeAppearance(resume: ResumeVersion): ResumeAppearance
   if (!appearance) {
     return defaults;
   }
+  const photoDataUrl = getResumePhotoDataUrl(appearance.photoDataUrl);
   return {
     fontFamily: appearance.fontFamily ?? defaults.fontFamily,
     fontSize: appearance.fontSize ?? defaults.fontSize,
@@ -29,8 +31,15 @@ export function resolveResumeAppearance(resume: ResumeVersion): ResumeAppearance
     pageMargin: appearance.pageMargin ?? defaults.pageMargin,
     pageCount: appearance.pageCount ?? defaults.pageCount,
     accent: appearance.accent ?? defaults.accent,
+    ...(photoDataUrl
+      ? { photoDataUrl, photoPosition: normalizeResumePhotoPosition(appearance.photoPosition) }
+      : {}),
   };
 }
+export function inheritResumeAppearance(resume: Pick<ResumeVersion, "appearance">): ResumeAppearance | undefined {
+  return resume.appearance ? { ...resume.appearance } : undefined;
+}
+
 const DOCX_LAYOUT_PROFILES: Record<ResumeTemplateLayout, {
   centeredHeader: boolean;
   titleExtra: number;
@@ -754,7 +763,9 @@ export async function buildResumeDocument(profile: CandidateProfile, resume: Res
     AlignmentType,
     BorderStyle,
     Document,
+    Header,
     HeadingLevel,
+    ImageRun,
     Paragraph,
     Table,
     TableCell,
@@ -762,16 +773,18 @@ export async function buildResumeDocument(profile: CandidateProfile, resume: Res
     TableLayoutType,
     TableRow,
     TextRun,
+    VerticalAlign,
     WidthType,
   } = await import("docx");
 
   const template = getResumeTemplateDefinition(resume.template);
   const layoutProfile = DOCX_LAYOUT_PROFILES[template.layout];
-
   const appearance = resolveResumeAppearance(resume);
   const font = getResumeFontOption(appearance.fontFamily);
   const accent = (appearance.accent ?? template.accent).replace("#", "").toUpperCase();
   const identity = getResumeIdentity(profile, resume);
+  const photoBytes = parseJpegDataUrl(appearance.photoDataUrl);
+  const photoPosition = normalizeResumePhotoPosition(appearance.photoPosition);
   const bodySize = Math.round(appearance.fontSize * 2);
   const headingSize = bodySize + 4;
   const lineSpacing = Math.round(appearance.lineHeight * 240);
@@ -832,28 +845,86 @@ export async function buildResumeDocument(profile: CandidateProfile, resume: Res
     ];
   };
 
-  const orderedSections = getOrderedResumeSections(resume);
-  const children: Array<DocxParagraph | DocxTable> = [
-    new Paragraph({
+  const titleParagraph = new Paragraph({
+    children: [
+      new TextRun({
+        text: identity.name,
+        font: font.wordFont,
+        bold: true,
+        color: accent,
+        size: bodySize + layoutProfile.titleExtra,
+      }),
+    ],
+    alignment: layoutProfile.centeredHeader ? AlignmentType.CENTER : AlignmentType.LEFT,
+    spacing: { after: 80 },
+  });
+  const contactParagraph = new Paragraph({
+    children: [new TextRun({ text: formatContact(identity), font: font.wordFont, color: "4C5A52", size: bodySize - 2 })],
+    alignment: layoutProfile.centeredHeader ? AlignmentType.CENTER : AlignmentType.LEFT,
+    spacing: { line: lineSpacing, after: 220 },
+  });
+
+  const children: Array<DocxParagraph | DocxTable> = [];
+  let firstPageHeader: InstanceType<typeof Header> | undefined;
+  if (photoBytes) {
+    const identityCell = new TableCell({
+      children: [titleParagraph, contactParagraph],
+      verticalAlign: VerticalAlign.CENTER,
+    });
+    const photoCell = new TableCell({
       children: [
-        new TextRun({
-          text: identity.name,
-          font: font.wordFont,
-          bold: true,
-          color: accent,
-          size: bodySize + layoutProfile.titleExtra,
+        new Paragraph({
+          alignment: layoutProfile.centeredHeader
+            ? AlignmentType.CENTER
+            : photoPosition === "left"
+              ? AlignmentType.LEFT
+              : AlignmentType.RIGHT,
+          children: [
+            new ImageRun({
+              type: "jpg",
+              data: photoBytes,
+              transformation: { width: 96, height: 128 },
+              altText: {
+                name: `${identity.name || "求职者"}照片`,
+                title: "简历照片",
+                description: "居中裁切为 3:4 的 JPEG 简历照片",
+              },
+            }),
+          ],
         }),
       ],
-      alignment: layoutProfile.centeredHeader ? AlignmentType.CENTER : AlignmentType.LEFT,
-      spacing: { after: 80 },
-    }),
-    new Paragraph({
-      children: [new TextRun({ text: formatContact(identity), font: font.wordFont, color: "4C5A52", size: bodySize - 2 })],
-      alignment: layoutProfile.centeredHeader ? AlignmentType.CENTER : AlignmentType.LEFT,
-      spacing: { line: lineSpacing, after: 220 },
-    }),
-  ];
+      verticalAlign: VerticalAlign.CENTER,
+    });
+    const blankCell = () =>
+      new TableCell({ children: [new Paragraph("")], verticalAlign: VerticalAlign.CENTER });
+    const headerCells = layoutProfile.centeredHeader
+      ? photoPosition === "left"
+        ? [photoCell, identityCell, blankCell()]
+        : [blankCell(), identityCell, photoCell]
+      : photoPosition === "left"
+        ? [photoCell, identityCell]
+        : [identityCell, photoCell];
 
+    firstPageHeader = new Header({
+      children: [
+        new Table({
+          rows: [new TableRow({ children: headerCells })],
+          columnWidths: layoutProfile.centeredHeader
+            ? [1300, 7400, 1300]
+            : photoPosition === "left"
+              ? [1600, 8400]
+              : [8400, 1600],
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          layout: TableLayoutType.FIXED,
+          borders: TableBorders.NONE,
+        }),
+      ],
+    });
+  } else {
+    children.push(titleParagraph, contactParagraph);
+  }
+
+  const orderedSections = getOrderedResumeSections(resume);
   if (isSidebarResumeLayout(template.layout)) {
     const sideChildren = orderedSections
       .filter((sectionData) => sideSectionIds.has(sectionData.id))
@@ -888,7 +959,9 @@ export async function buildResumeDocument(profile: CandidateProfile, resume: Res
     title: resume.title,
     sections: [
       {
+        headers: firstPageHeader ? { first: firstPageHeader } : undefined,
         properties: {
+          titlePage: Boolean(photoBytes),
           page: {
             margin: {
               top: pageMargin,
@@ -917,11 +990,13 @@ export async function downloadDocxFile(profile: CandidateProfile, resume: Resume
 
 export function renderResumeHtml(profile: CandidateProfile, resume: ResumeVersion) {
   const template = getResumeTemplateDefinition(resume.template);
-
   const appearance = resolveResumeAppearance(resume);
   const font = getResumeFontOption(appearance.fontFamily);
   const identity = getResumeIdentity(profile, resume);
   const accent = /^#[0-9a-f]{6}$/i.test(appearance.accent ?? "") ? appearance.accent! : template.accent;
+  const photoDataUrl = getResumePhotoDataUrl(appearance.photoDataUrl);
+  const photoPosition = normalizeResumePhotoPosition(appearance.photoPosition);
+  const centeredHeader = isCenteredResumeHeader(template.layout);
   const escape = (value: string) =>
     value
       .replace(/&/g, "&amp;")
@@ -954,7 +1029,7 @@ export function renderResumeHtml(profile: CandidateProfile, resume: ResumeVersio
 
   const layoutStyles: Record<string, string> = {
     "campus-growth": `.resume-layout--campus-growth h2 { border-bottom: 1.5px solid ${accent}; }`,
-    "campus-research": `.resume-layout--campus-research header { text-align: center; } .resume-layout--campus-research h2 { border-top: 1px solid ${accent}; border-bottom: 0; padding-top: 5px; }`,
+    "campus-research": `.resume-layout--campus-research h2 { border-top: 1px solid ${accent}; border-bottom: 0; padding-top: 5px; }`,
     "internship-skills": `.resume-layout--internship-skills h2 { display: inline-block; padding: 2px 8px; background: ${accent}14; border-bottom: 0; }`,
     "internship-project": `.resume-layout--internship-project section[data-section-id="projects"] { padding: 12px 0; border-block: 1px solid ${accent}55; }`,
     "professional-impact": `.resume-layout--professional-impact h2 { border-bottom: 2px solid ${accent}; letter-spacing: .04em; }`,
@@ -965,11 +1040,37 @@ export function renderResumeHtml(profile: CandidateProfile, resume: ResumeVersio
     "operations-metrics": `.resume-layout--operations-metrics h2 { border-bottom: 3px solid ${accent}; } .resume-layout--operations-metrics section[data-section-id="awards"] { padding: 8px 10px; background: ${accent}0d; }`,
     "design-editorial": `.resume-layout--design-editorial h2 { border-bottom: 0; color: ${accent}; font-size: 1.45em; } .resume-layout--design-editorial section[data-section-id="projects"] { padding: 10px 0; border-block: 1px solid #d6e7ef; }`,
     "portfolio-sidebar": `.resume-layout--portfolio-sidebar { display: grid; grid-template-columns: minmax(0, 0.3fr) minmax(0, 0.7fr); gap: 13mm; align-items: start; } .resume-layout--portfolio-sidebar .resume-side { border-right: 1px solid ${accent}; padding-right: 6mm; }`,
-    "management-brief": `.resume-layout--management-brief header { padding-bottom: 12px; border-bottom: 5px solid ${accent}; } .resume-layout--management-brief h2 { border-bottom: 1px solid #a6bcc7; }`,
+    "management-brief": `.resume-sheet[data-layout="management-brief"] .resume-header { padding-bottom: 12px; border-bottom: 5px solid ${accent}; } .resume-layout--management-brief h2 { border-bottom: 1px solid #a6bcc7; }`,
     "consulting-case": `.resume-layout--consulting-case h2 { border-left: 3px solid ${accent}; padding-left: 7px; border-bottom: 1px solid #cbd8de; } .resume-layout--consulting-case li { margin-block: 5px; }`,
-    "academic-classic": `.resume-layout--academic-classic header { text-align: center; } .resume-layout--academic-classic h2 { border-bottom: 1px solid ${accent}; text-transform: uppercase; letter-spacing: .06em; }`,
+    "academic-classic": `.resume-layout--academic-classic h2 { border-bottom: 1px solid ${accent}; text-transform: uppercase; letter-spacing: .06em; }`,
     "academic-compact": `.resume-layout--academic-compact h2 { border-bottom: 1px solid #9fb4bf; font-size: 1.05em; } .resume-layout--academic-compact section { margin-top: 9px; }`,
   };
+
+  const photoHeaderStyles = photoDataUrl
+    ? `
+    .resume-header--has-photo { display: grid; align-items: center; gap: 6mm; }
+    .resume-header--photo-left { grid-template-columns: 28mm minmax(0, 1fr); }
+    .resume-header--photo-right { grid-template-columns: minmax(0, 1fr) 28mm; }
+    .resume-header--centered.resume-header--has-photo { grid-template-columns: 28mm minmax(0, 1fr) 28mm; text-align: center; }
+    .resume-header--centered.resume-header--has-photo .resume-header__identity { grid-column: 2; text-align: center; }
+    .resume-header--centered.resume-header--photo-left .resume-photo { grid-column: 1; }
+    .resume-header--centered.resume-header--photo-right .resume-photo { grid-column: 3; }
+    .resume-photo { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border: 1px solid ${accent}55; border-radius: 2mm; background: #f4f7f8; print-color-adjust: exact; }
+    `
+    : "";
+  const headerClass = [
+    "resume-header",
+    centeredHeader ? "resume-header--centered" : "",
+    photoDataUrl ? "resume-header--has-photo" : "",
+    photoDataUrl ? `resume-header--photo-${photoPosition}` : "",
+  ].filter(Boolean).join(" ");
+  const photoHtml = photoDataUrl
+    ? `<img class="resume-photo" src="${escape(photoDataUrl)}" alt="${escape(identity.name || "求职者")}的照片" data-photo-position="${photoPosition}" />`
+    : "";
+  const identityHtml = `<div class="resume-header__identity"><h1>${escape(identity.name)}</h1><div class="meta">${escape(formatContact(identity))}</div></div>`;
+  const headerHtml = photoDataUrl && photoPosition === "left"
+    ? `${photoHtml}${identityHtml}`
+    : `${identityHtml}${photoHtml}`;
 
   return `<!doctype html>
 <html lang="zh-CN">
@@ -983,7 +1084,8 @@ export function renderResumeHtml(profile: CandidateProfile, resume: ResumeVersio
     body { margin: 0; color: #151b17; font-family: ${font.stack}; font-size: ${appearance.fontSize}pt; line-height: ${appearance.lineHeight}; }
     .resume-sheet { width: auto; max-width: 210mm; min-height: ${appearance.pageCount === 1 ? "297mm" : "594mm"}; margin: 0 auto; padding: 0; background: white; }
     .resume-sheet[data-page-count="2"] { box-shadow: inset 0 0 0 1px #e1edf3; }
-    header { border-bottom: 2px solid ${accent}; padding-bottom: 10px; margin-bottom: 12px; }
+    header.resume-header { border-bottom: 2px solid ${accent}; padding-bottom: 10px; margin-bottom: 12px; }
+    .resume-header--centered { text-align: center; }
     h1 { margin: 0; color: ${accent}; font-size: ${template.layout === "design-editorial" ? "2.35em" : "2em"}; letter-spacing: ${template.layout === "design-editorial" ? "0.02em" : "0"}; }
     .meta { margin-top: 4px; color: #4c5a52; font-size: .88em; }
     .resume-layout { display: block; }
@@ -994,6 +1096,7 @@ export function renderResumeHtml(profile: CandidateProfile, resume: ResumeVersio
     li { margin: .28em 0; }
     .resume-side, .resume-main { min-width: 0; }
     ${layoutStyles[template.layout]}
+    ${photoHeaderStyles}
     @media screen {
       body { padding: 24px; background: #edf5f9; }
       .resume-sheet { width: 210mm; padding: ${appearance.pageMargin}mm; box-shadow: 0 8px 28px #1d4d6517; }
@@ -1005,17 +1108,32 @@ export function renderResumeHtml(profile: CandidateProfile, resume: ResumeVersio
   </style>
 </head>
 <body>
-  <main class="resume-sheet resume-layout--${escape(template.layout)}" data-template-id="${escape(template.id)}" data-layout="${escape(template.layout)}" data-page-count="${appearance.pageCount}">
-    <header>
-      <h1>${escape(identity.name)}</h1>
-      <div class="meta">${escape(formatContact(identity))}</div>
-    </header>
+  <main class="resume-sheet" data-template-id="${escape(template.id)}" data-layout="${escape(template.layout)}" data-page-count="${appearance.pageCount}" data-header-layout="${centeredHeader ? "centered" : "leading"}">
+    <header class="${headerClass}" data-photo-position="${photoPosition}">${headerHtml}</header>
     <div class="resume-layout resume-layout--${escape(template.layout)}">${bodyHtml}</div>
   </main>
 </body>
 </html>`;
 }
-export function printResumeAsPdf(profile: CandidateProfile, resume: ResumeVersion) {
+function waitForImageElement(image: HTMLImageElement) {
+  if (image.complete) {
+    return image.naturalWidth > 0 ? Promise.resolve() : Promise.reject(new Error("Image load failed"));
+  }
+  return new Promise<void>((resolve, reject) => {
+    image.addEventListener("load", () => resolve(), { once: true });
+    image.addEventListener("error", () => reject(new Error("Image load failed")), { once: true });
+  });
+}
+
+export async function waitForResumePrintReady(printWindow: Window) {
+  const printDocument = printWindow.document;
+  await Promise.all(Array.from(printDocument.images).map(waitForImageElement));
+  if (printDocument.fonts) {
+    await printDocument.fonts.ready;
+  }
+}
+
+export async function printResumeAsPdf(profile: CandidateProfile, resume: ResumeVersion) {
   const printWindow = window.open("", "_blank", "width=900,height=1200");
   if (!printWindow) {
     throw new Error("Popup blocked");
@@ -1023,8 +1141,7 @@ export function printResumeAsPdf(profile: CandidateProfile, resume: ResumeVersio
   printWindow.document.open();
   printWindow.document.write(renderResumeHtml(profile, resume));
   printWindow.document.close();
+  await waitForResumePrintReady(printWindow);
   printWindow.focus();
-  window.setTimeout(() => {
-    printWindow.print();
-  }, 250);
+  printWindow.print();
 }

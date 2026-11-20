@@ -274,7 +274,7 @@ test('mobile toolbar stacks primary controls and keeps appearance controls touch
     expect.soft(field.width, `appearance field ${index + 1} is narrower than 140px`).toBeGreaterThanOrEqual(139.5);
   });
 
-  const controls = await layoutBoxes(page.locator('.builder-controls button:visible, .builder-controls select:visible, .builder-controls input:visible, .builder-controls summary:visible'));
+  const controls = await layoutBoxes(page.locator('.builder-controls button:visible, .builder-controls select:visible, .builder-controls input:visible:not([type="file"]), .builder-controls summary:visible'));
   expect.soft(controls.length).toBeGreaterThan(0);
   controls.forEach((control, index) => {
     expect.soft(control.height, `visible toolbar target ${index + 1} is shorter than 44px`).toBeGreaterThanOrEqual(43.5);

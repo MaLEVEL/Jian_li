@@ -111,6 +111,7 @@ export interface ResumeTemplateDefinition {
 export type ResumeFontFamily = "sans" | "serif" | "editorial";
 
 export type ResumePageCount = 1 | 2;
+export type ResumePhotoPosition = "left" | "right";
 
 export interface ResumeAppearance {
   fontFamily: ResumeFontFamily;
@@ -119,6 +120,8 @@ export interface ResumeAppearance {
   pageMargin: number;
   pageCount: ResumePageCount;
   accent?: string;
+  photoDataUrl?: string;
+  photoPosition?: ResumePhotoPosition;
 }
 
 export type JobFrameworkId =
@@ -288,6 +291,9 @@ export interface OpportunityRecord {
   source: OpportunitySource;
   sourceJobId?: string;
   sourceUrl?: string;
+  sourceKey?: string;
+  blacklistedAt?: string;
+  blacklistReason?: string;
   applicationId?: string;
   resumeId?: string;
   channel: string;

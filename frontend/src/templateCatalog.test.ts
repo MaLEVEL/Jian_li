@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import { describe, expect, it } from "vitest";
 import { DEFAULT_PROFILE, RESUME_TEMPLATE_OPTIONS } from "./constants";
 import {
@@ -7,6 +8,7 @@ import {
   buildFrameworkOutlineMarkdown,
   getJobFramework,
   getResumeTemplateDefinition,
+  isCenteredResumeHeader,
   isResumeTemplate,
 } from "./templateCatalog";
 import { buildResumeDocument, getOrderedResumeSections, renderResumeHtml } from "./resumeLogic";
@@ -21,6 +23,26 @@ const sections = {
   experience: ["后端实习：参与接口开发与测试"],
   awards: ["校级课程设计奖"],
 };
+
+const photoDataUrl = "data:image/jpeg;base64,/9j/2Q==";
+
+function buildResumeWithPhoto(
+  template: ResumeVersion["template"],
+  photoPosition: "left" | "right" = "right",
+): ResumeVersion {
+  return {
+    ...buildResume(template),
+    appearance: {
+      fontFamily: "sans",
+      fontSize: 12,
+      lineHeight: 1.55,
+      pageMargin: 16,
+      pageCount: 1,
+      photoDataUrl,
+      photoPosition,
+    },
+  };
+}
 
 function buildResume(template: ResumeVersion["template"]): ResumeVersion {
   return {
@@ -302,6 +324,61 @@ describe("resume export layout consistency", () => {
     });
   });
 
+  it("renders the same version photo in a unified header for all sixteen templates", () => {
+    RESUME_TEMPLATE_CATALOG.forEach((template) => {
+      const resume = buildResumeWithPhoto(template.id, "left");
+      const html = renderResumeHtml(DEFAULT_PROFILE, resume);
+      expect(html, template.id).toContain(`src="${photoDataUrl}"`);
+      expect(html, template.id).toMatch(/class="resume-header[^"]*resume-header--has-photo[^"]*resume-header--photo-left/);
+      expect(html, template.id).toContain(`data-header-layout="${isCenteredResumeHeader(template.layout) ? "centered" : "leading"}"`);
+      if (isCenteredResumeHeader(template.layout)) {
+        expect(html, template.id).toContain(".resume-header--centered.resume-header--has-photo { grid-template-columns: 28mm minmax(0, 1fr) 28mm;");
+      }
+      if (template.layout === "product-sidebar" || template.layout === "portfolio-sidebar") {
+        expect(html.indexOf('<header class="resume-header')).toBeLessThan(html.indexOf('<div class="resume-layout resume-layout--'));
+      }
+    });
+
+    const leftHtml = renderResumeHtml(DEFAULT_PROFILE, buildResumeWithPhoto("technical", "left"));
+    const rightHtml = renderResumeHtml(DEFAULT_PROFILE, buildResumeWithPhoto("technical", "right"));
+    expect(leftHtml.indexOf('<img class="resume-photo"')).toBeLessThan(leftHtml.indexOf("<h1>"));
+    expect(rightHtml.indexOf('<img class="resume-photo"')).toBeGreaterThan(rightHtml.indexOf("<h1>"));
+  });
+
+  it("embeds the same JPEG bytes in a first-page DOCX ImageRun and keeps centered headers symmetrical", async () => {
+    const { Packer } = await import("docx");
+    const JSZip = (await import("jszip")).default;
+    const jpegBytes = Buffer.from(photoDataUrl.split(",")[1], "base64");
+
+    async function docxParts(template: ResumeVersion["template"], position: "left" | "right") {
+      const archive = await JSZip.loadAsync(await Packer.toBuffer(await buildResumeDocument(
+        DEFAULT_PROFILE,
+        buildResumeWithPhoto(template, position),
+      )));
+      const documentXml = await archive.file("word/document.xml")?.async("string");
+      const headerNames = Object.keys(archive.files).filter((name) => /^word\/header\d+\.xml$/.test(name));
+      const mediaNames = Object.keys(archive.files).filter((name) => /^word\/media\/[^/]+$/.test(name));
+      const headerXml = await archive.file(headerNames[0])?.async("string");
+      if (!documentXml || !headerXml || !mediaNames.length) {
+        throw new Error("DOCX photo header parts are missing");
+      }
+      return { archive, documentXml, headerXml, mediaNames };
+    }
+
+    const centered = await docxParts("academic", "left");
+    expect(centered.documentXml).toMatch(/<w:titlePg\b/);
+    expect(centered.headerXml).toContain("<w:drawing>");
+    expect((centered.headerXml.match(/<w:gridCol/g) ?? []).length).toBe(3);
+    expect(centered.headerXml.indexOf("<w:drawing>")).toBeLessThan(centered.headerXml.indexOf(DEFAULT_PROFILE.name));
+    expect(centered.headerXml).toContain('w:jc w:val="center"');
+
+    const right = await docxParts("sidebar", "right");
+    expect(right.headerXml.indexOf("<w:drawing>")).toBeGreaterThan(right.headerXml.indexOf(DEFAULT_PROFILE.name));
+    expect((right.headerXml.match(/<w:gridCol/g) ?? []).length).toBe(2);
+
+    const mediaBytes = Buffer.from(await right.archive.file(right.mediaNames[0])!.async("uint8array"));
+    expect(mediaBytes.equals(jpegBytes)).toBe(true);
+  });
   it("builds DOCX output with a two-column table for sidebar and one-column flow for others", async () => {
     const { Packer } = await import("docx");
     const JSZip = (await import("jszip")).default;

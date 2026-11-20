@@ -121,6 +121,10 @@ export function isSidebarResumeLayout(layout: ResumeTemplateLayout) {
   return layout === "product-sidebar" || layout === "portfolio-sidebar";
 }
 
+export function isCenteredResumeHeader(layout: ResumeTemplateLayout) {
+  return layout === "campus-research" || layout === "academic-classic" || layout === "academic-compact";
+}
+
 export const RESUME_TEMPLATE_CATALOG: readonly ResumeTemplateDefinition[] = [
   {
     id: "graduate",

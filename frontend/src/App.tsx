@@ -33,6 +33,7 @@ import {
   extractResumeIdentityFromText,
   extractResumeTargetRoleFromText,
   findUnsupportedClaims,
+  inheritResumeAppearance,
   optimizeResume,
   printResumeAsPdf,
   renderResumeText,
@@ -77,12 +78,17 @@ import { TemplateLibrary } from "./components/TemplateLibrary";
 import type { OpportunityHandlers, OpportunityCenterRecord } from "./components/OpportunityCenter";
 import { ApplicationsView, BuilderView, OptimizerView, ProfileView, WorkspaceView } from "./views";
 import {
+  applyCompanyBlacklist,
   createDefaultNextAction,
   createManualOpportunity,
+  createOpportunityCompanyKey,
   generateRuleBasedInterviewPackage,
+  getCompanyBlacklistStates,
   groupApplicationTasks,
   OPPORTUNITY_STAGE_LABELS,
   parseOpportunityCsv,
+  restoreCompanyBlacklist,
+  upsertOpportunity,
 } from "./opportunityPipeline";
 
 function normalizeJobKey(job: JobDraft) {
@@ -192,9 +198,15 @@ export default function App() {
       };
     });
   }, [applications, opportunities, resumes]);
+  const visibleOpportunities = useMemo(() => {
+    const blacklistedCompanies = getCompanyBlacklistStates(opportunities);
+    return opportunities.filter((opportunity) =>
+      !blacklistedCompanies.has(createOpportunityCompanyKey(opportunity.job.company)),
+    );
+  }, [opportunities]);
   const taskGroups = useMemo(
-    () => groupApplicationTasks(opportunities, applications),
-    [applications, opportunities],
+    () => groupApplicationTasks(visibleOpportunities, applications),
+    [applications, visibleOpportunities],
   );
   const todayTasks = useMemo(
     () => [...taskGroups.overdue, ...taskGroups.today, ...taskGroups.next7Days].map((item) => ({
@@ -214,9 +226,13 @@ export default function App() {
     })),
     [taskGroups],
   );
-  const todayInterviews = useMemo(
-    () => applications
-      .filter((application) => application.interviewAt)
+  const todayInterviews = useMemo(() => {
+    const blacklistedCompanies = getCompanyBlacklistStates(opportunities);
+    return applications
+      .filter((application) =>
+        application.interviewAt &&
+        !blacklistedCompanies.has(createOpportunityCompanyKey(application.job.company)),
+      )
       .map((application) => ({
         id: application.id,
         company: application.job.company,
@@ -224,11 +240,10 @@ export default function App() {
         at: application.interviewAt,
         format: "video" as const,
         opportunityId: opportunities.find((opportunity) => opportunity.applicationId === application.id)?.id,
-      })),
-    [applications, opportunities],
-  );
+      }));
+  }, [applications, opportunities]);
   const todayOpportunities = useMemo(
-    () => opportunities
+    () => visibleOpportunities
       .filter((opportunity) => opportunity.stage !== "unsuitable" && opportunity.stage !== "closed")
       .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
       .map((opportunity) => ({
@@ -238,7 +253,7 @@ export default function App() {
         stageLabel: OPPORTUNITY_STAGE_LABELS[opportunity.stage],
         nextStep: opportunity.nextAction?.completedAt ? "下一步已完成" : opportunity.nextAction?.title,
       })),
-    [opportunities],
+    [visibleOpportunities],
   );
   const currentInterviewOpportunity = useMemo(
     () => opportunities.find((opportunity) => opportunity.id === interviewOpportunityId),
@@ -566,6 +581,7 @@ export default function App() {
       company: SAMPLE_FRONTEND_JOB.company,
       jobTitle: SAMPLE_FRONTEND_JOB.title,
       parentResumeId: baseResume.id,
+      appearance: inheritResumeAppearance(baseResume),
       sections: optimizedSections,
       plainText: optimizedPlainText,
       unsupportedClaims: findUnsupportedClaims(DEFAULT_PROFILE, optimizedPlainText),
@@ -844,6 +860,7 @@ export default function App() {
                 company: matchPreview.job.company,
                 jobTitle: matchPreview.job.title,
                 identity: optimizedIdentity,
+                appearance: inheritResumeAppearance(sourceResume),
                 sections,
                 plainText,
                 unsupportedClaims: findUnsupportedClaims(profile, plainText),
@@ -875,6 +892,7 @@ export default function App() {
       company: matchPreview.job.company,
       jobTitle: matchPreview.job.title,
       parentResumeId: baseResumeId,
+      appearance: inheritResumeAppearance(sourceResume),
       sections,
       plainText,
       unsupportedClaims: findUnsupportedClaims(profile, plainText),
@@ -1194,16 +1212,21 @@ export default function App() {
     }
   }
 
-  function exportResumePdf(resume: ResumeVersion) {
+  async function exportResumePdf(resume: ResumeVersion) {
     if (!resume.reviewed) {
       setMessage("请先勾选“我已核对”，再打开打印/保存 PDF。", "warning");
       return;
     }
     try {
-      printResumeAsPdf(profile, resume);
+      await printResumeAsPdf(profile, resume);
       setMessage("已打开浏览器打印窗口，请在打印目标里选择“另存为 PDF”或“保存为 PDF”。");
-    } catch {
-      setMessage("浏览器拦截了打印窗口，请允许弹窗后再试。", "warning");
+    } catch (error) {
+      setMessage(
+        error instanceof Error && /image load failed/i.test(error.message)
+          ? "简历照片加载失败，已阻止打印。请更换照片后重试。"
+          : "浏览器拦截了打印窗口，请允许弹窗后再试。",
+        "warning",
+      );
     }
   }
 
@@ -1381,37 +1404,16 @@ export default function App() {
       setMessage("没有可导入的有效机会。", "warning");
       return;
     }
-    const seen = new Set(opportunities.map((opportunity) => [
-      opportunity.job.company.trim().toLowerCase(),
-      opportunity.job.title.trim().toLowerCase(),
-      opportunity.sourceUrl ?? "",
-    ].join("::")));
-    const additions = imported.filter((opportunity) => {
-      const key = [
-        opportunity.job.company.trim().toLowerCase(),
-        opportunity.job.title.trim().toLowerCase(),
-        opportunity.sourceUrl ?? "",
-      ].join("::");
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-    setOpportunities((current) => [...additions, ...current]);
-    setMessage(`已导入 ${additions.length} 条机会；${imported.length - additions.length} 条重复记录不会覆盖现有状态。`);
+    const next = imported.reduce(
+      (current, opportunity) => upsertOpportunity(current, opportunity),
+      opportunities,
+    );
+    const additions = Math.max(0, next.length - opportunities.length);
+    setOpportunities(next);
+    setMessage(`已导入 ${additions} 条新机会；${imported.length - additions} 条重复记录已按来源合并，已有阶段与下一步保持不变。`);
   }
 
   function addBossJobToFunnel(job: BossJobRecord) {
-    const existing = opportunities.find((opportunity) =>
-      opportunity.sourceJobId === job.source_job_id ||
-      (opportunity.sourceUrl && opportunity.sourceUrl === job.source_url),
-    );
-    if (existing) {
-      setInterviewOpportunityId("");
-      setIntegrationSection("funnel");
-      navigateTo("integration");
-      setMessage("该 BOSS 职位已在机会漏斗中，已保留现有状态。", "warning");
-      return;
-    }
     const created = createManualOpportunity({
       company: job.company,
       title: job.title,
@@ -1430,9 +1432,82 @@ export default function App() {
       sourceJobId: job.source_job_id,
       sourceUrl: job.source_url,
     };
-    setOpportunities((current) => [opportunity, ...current]);
+    const next = upsertOpportunity(opportunities, opportunity);
+    const duplicate = next.length === opportunities.length;
+    setOpportunities(next);
     setIntegrationSection("funnel");
-    setMessage(`已将“${job.company} · ${job.title}”加入机会漏斗；没有触发投递或沟通。`);
+    navigateTo("integration");
+    setMessage(
+      duplicate
+        ? "该 BOSS 职位已在机会漏斗中，已更新岗位快照并保留现有阶段。"
+        : `已将“${job.company} · ${job.title}”加入机会漏斗；没有触发投递或沟通。`,
+      duplicate ? "warning" : "success",
+    );
+  }
+
+  function attachSelectedResumeToOpportunity(opportunityId: string) {
+    const resume = selectedResume ?? resumes[0];
+    if (!resume) {
+      setMessage("当前还没有简历版本，先生成或导入一份简历。", "warning");
+      navigateTo("builder");
+      return;
+    }
+    const opportunity = opportunities.find((item) => item.id === opportunityId);
+    updateOpportunity(opportunityId, (current) => ({
+      ...current,
+      resumeId: resume.id,
+      updatedAt: new Date().toISOString(),
+    }));
+    setSelectedResumeId(resume.id);
+    navigateTo("builder");
+    setMessage(`已将“${resume.title}”关联到${opportunity ? `“${opportunity.job.company} · ${opportunity.job.title}”` : "当前机会"}。`);
+  }
+
+  function prepareOpportunityResume(opportunityId: string) {
+    const opportunity = opportunities.find((item) => item.id === opportunityId);
+    const sourceResume = resumes.find((resume) => resume.id === opportunity?.resumeId) ?? selectedResume ?? resumes[0];
+    if (!opportunity) {
+      setMessage("无法准备简历：机会不存在。", "error");
+      return;
+    }
+    if (!sourceResume) {
+      setMessage("请先生成或导入一份基础简历，再按岗位准备定制版。", "warning");
+      navigateTo("builder");
+      return;
+    }
+    const job = {
+      company: opportunity.job.company,
+      title: opportunity.job.title,
+      description: opportunity.job.description,
+    };
+    const report = analyzeMatch(sourceResume.plainText, job.description, sourceResume.sections);
+    setSelectedResumeId(sourceResume.id);
+    setJobDraft(job);
+    setMatchPreview({
+      job,
+      resumeId: sourceResume.id,
+      resumeTitle: sourceResume.title,
+      report,
+      updatedAt: new Date().toISOString(),
+    });
+    navigateTo("optimizer");
+    setMessage("已带入岗位 JD、来源简历和匹配报告；确认后即可生成岗位定制版。");
+  }
+
+  function blacklistOpportunityCompany(opportunityId: string) {
+    const opportunity = opportunities.find((item) => item.id === opportunityId);
+    if (!opportunity) return;
+    setOpportunities((current) => applyCompanyBlacklist(current, opportunityId, {
+      reason: "用户从机会操作条拉黑，不再推进该公司机会",
+    }));
+    setMessage(`已将“${opportunity.job.company}”加入公司黑名单；历史机会仍保留，可随时恢复。`, "warning");
+  }
+
+  function restoreOpportunityCompany(opportunityId: string) {
+    const opportunity = opportunities.find((item) => item.id === opportunityId);
+    if (!opportunity) return;
+    setOpportunities((current) => restoreCompanyBlacklist(current, opportunityId));
+    setMessage(`已恢复“${opportunity.job.company}”的公司机会。`);
   }
 
   function openInterviewPackage(opportunityId: string) {
@@ -1461,6 +1536,8 @@ export default function App() {
       description: opportunity.job.description,
     });
     setMatchPreview(undefined);
+    const linkedResume = resumes.find((resume) => resume.id === opportunity.resumeId);
+    if (linkedResume) setSelectedResumeId(linkedResume.id);
     if (!resumes.length) {
       navigateTo("profile");
       setMessage("已带入机会 JD。请先完善经历库并生成一份基础简历。", "warning");
@@ -1652,6 +1729,11 @@ export default function App() {
               onConfirmImport: confirmOpportunityImport,
               onOpenInterviewPackage: openInterviewPackage,
               onAnalyze: analyzeOpportunity,
+              onMatchJd: analyzeOpportunity,
+              onSelectResume: attachSelectedResumeToOpportunity,
+              onGenerateResume: prepareOpportunityResume,
+              onBlacklist: blacklistOpportunityCompany,
+              onRestoreBlacklist: restoreOpportunityCompany,
               onSaveView: saveOpportunityView,
             }}
           />

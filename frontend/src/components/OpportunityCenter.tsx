@@ -19,7 +19,14 @@ import {
   X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { OPPORTUNITY_STAGE_LABELS, parseOpportunityCsv } from "../opportunityPipeline";
+import {
+  OPPORTUNITY_STAGE_LABELS,
+  createOpportunityCompanyKey,
+  createOpportunitySourceKey,
+  getCompanyBlacklistStates,
+  parseOpportunityCsv,
+  type OpportunityCompanyBlacklistState,
+} from "../opportunityPipeline";
 import type {
   ApplicationNextAction,
   ApplicationRecord,
@@ -51,6 +58,11 @@ export interface OpportunityHandlers {
   onConfirmImport?: (kind: "paste" | "csv", rawText: string) => void;
   onOpenInterviewPackage?: (opportunityId: string) => void;
   onAnalyze?: (opportunity: OpportunityCenterRecord) => void;
+  onMatchJd?: (opportunity: OpportunityCenterRecord) => void;
+  onSelectResume?: (opportunityId: string) => void;
+  onGenerateResume?: (opportunityId: string) => void;
+  onBlacklist?: (opportunityId: string) => void;
+  onRestoreBlacklist?: (opportunityId: string) => void;
   onSaveView?: (view: Omit<SavedJobView, "id">) => void;
 }
 
@@ -60,6 +72,7 @@ export interface OpportunityCenterProps {
   handlers: OpportunityHandlers;
   title?: string;
   description?: string;
+  showBlacklistedByDefault?: boolean;
 }
 
 type ImportKind = "paste" | "csv";
@@ -227,12 +240,28 @@ function buildPreview(kind: ImportKind, rawText: string): { rows: ImportPreviewR
   return { rows, error: "" };
 }
 
+function sourceReference(opportunity: OpportunityCenterRecord) {
+  if (opportunity.sourceJobId) return `岗位编号 ${opportunity.sourceJobId}`;
+  if (opportunity.sourceUrl) {
+    try {
+      return `来源域名 ${new URL(opportunity.sourceUrl).hostname}`;
+    } catch {
+      return "已记录来源链接";
+    }
+  }
+  return "按公司、岗位与城市识别";
+}
+
 function OpportunityCard({
   handlers,
   opportunity,
+  blacklistState,
+  duplicateCount,
 }: {
   handlers: OpportunityHandlers;
   opportunity: OpportunityCenterRecord;
+  blacklistState?: OpportunityCompanyBlacklistState;
+  duplicateCount: number;
 }) {
   const [followUpDraft, setFollowUpDraft] = useState(
     opportunity.nextAction?.dueAt ? opportunity.nextAction.dueAt.slice(0, 16) : "",
@@ -242,14 +271,18 @@ function OpportunityCard({
   const isExited = opportunity.stage === "unsuitable" || opportunity.stage === "closed";
   const canUndo = opportunity.stage !== "new";
   const actionOverdue = opportunity.nextAction ? isOverdue(opportunity.nextAction.dueAt) : false;
+  const matchOpportunity = handlers.onMatchJd ?? handlers.onAnalyze;
 
   return (
-    <article className="opportunity-card" aria-labelledby={`opportunity-${opportunity.id}-title`}>
+    <article
+      className={`opportunity-card ${blacklistState ? "is-blacklisted" : ""}`}
+      aria-labelledby={`opportunity-${opportunity.id}-title`}
+    >
       <header className="opportunity-card__header">
         <div>
           <div className="opportunity-card__meta">
             <span className={`opportunity-stage opportunity-stage--${stage.tone}`}>{stage.label}</span>
-            <span>{SOURCE_LABELS[opportunity.source]}</span>
+            <span>来源：{SOURCE_LABELS[opportunity.source]}</span>
             {opportunity.application?.report.score !== undefined ? (
               <span>匹配 {opportunity.application.report.score}%</span>
             ) : null}
@@ -264,9 +297,27 @@ function OpportunityCard({
         ) : null}
       </header>
 
+      {blacklistState ? (
+        <aside className="opportunity-card__blacklist" aria-label="公司级黑名单原因">
+          <Ban size={17} aria-hidden="true" />
+          <div>
+            <strong>公司级黑名单</strong>
+            <span>
+              {blacklistState.blacklistReason || "同公司机会已拉黑"}
+              {blacklistState.blacklistedAt ? ` · ${formatDate(blacklistState.blacklistedAt, true)}` : ""}
+            </span>
+          </div>
+        </aside>
+      ) : null}
+
       <div className="opportunity-card__facts">
         <span><BriefcaseBusiness size={15} aria-hidden="true" />{stage.hint}</span>
         <span><CalendarClock size={15} aria-hidden="true" />更新于 {formatDate(opportunity.stageChangedAt || opportunity.updatedAt)}</span>
+        <span><ExternalLink size={15} aria-hidden="true" />{sourceReference(opportunity)}</span>
+        <span className={`opportunity-dedup-status ${duplicateCount > 1 ? "is-duplicate" : ""}`}>
+          <CheckCircle2 size={15} aria-hidden="true" />
+          {duplicateCount > 1 ? `检测到 ${duplicateCount} 条重复记录` : "重复检查通过"}
+        </span>
         {opportunity.resume ? <span><UserRoundCheck size={15} aria-hidden="true" />{opportunity.resume.title}</span> : null}
       </div>
 
@@ -291,7 +342,7 @@ function OpportunityCard({
         </section>
       ) : null}
 
-      <div className="opportunity-card__actions">
+      <div className="opportunity-card__actions opportunity-card__stage-actions" aria-label="阶段操作">
         {advanceTo ? (
           <button
             className="primary-button opportunity-button"
@@ -299,15 +350,6 @@ function OpportunityCard({
             onClick={() => handlers.onAdvance(opportunity.id, advanceTo)}
           >
             推进至 {STAGE_DEFINITIONS[advanceTo].label}<ArrowRight size={16} aria-hidden="true" />
-          </button>
-        ) : null}
-        {opportunity.job.description && handlers.onAnalyze ? (
-          <button
-            className="secondary-button opportunity-button"
-            type="button"
-            onClick={() => handlers.onAnalyze?.(opportunity)}
-          >
-            <Search size={16} aria-hidden="true" />用 JD 匹配
           </button>
         ) : null}
         {opportunity.stage === "interviewing" && handlers.onOpenInterviewPackage ? (
@@ -339,33 +381,82 @@ function OpportunityCard({
         ) : null}
       </div>
 
-      {handlers.onScheduleFollowUp ? (
-        <details className="opportunity-card__follow-up">
-          <summary><CalendarClock size={16} aria-hidden="true" />安排跟进</summary>
-          <div>
-            <label>
-              <span>跟进时间</span>
-              <input
-                type="datetime-local"
-                value={followUpDraft}
-                onChange={(event) => setFollowUpDraft(event.currentTarget.value)}
-              />
-            </label>
+      <section className="opportunity-card__operation-bar" aria-label="机会操作条">
+        <div className="opportunity-card__actions">
+          {opportunity.job.description && matchOpportunity ? (
             <button
               className="secondary-button opportunity-button"
               type="button"
-              disabled={!followUpDraft}
-              onClick={() => handlers.onScheduleFollowUp?.(opportunity.id, followUpDraft)}
+              onClick={() => matchOpportunity(opportunity)}
             >
-              保存任务
+              <Search size={16} aria-hidden="true" />用 JD 匹配
             </button>
-          </div>
-        </details>
-      ) : null}
+          ) : null}
+          {handlers.onSelectResume ? (
+            <button
+              className="secondary-button opportunity-button"
+              type="button"
+              onClick={() => handlers.onSelectResume?.(opportunity.id)}
+            >
+              <UserRoundCheck size={16} aria-hidden="true" />{opportunity.resume ? "更换简历" : "选择简历"}
+            </button>
+          ) : null}
+          {handlers.onGenerateResume ? (
+            <button
+              className="secondary-button opportunity-button"
+              type="button"
+              onClick={() => handlers.onGenerateResume?.(opportunity.id)}
+            >
+              <Sparkles size={16} aria-hidden="true" />带入定制
+            </button>
+          ) : null}
+          {blacklistState && handlers.onRestoreBlacklist ? (
+            <button
+              className="ghost-button opportunity-button opportunity-button--restore"
+              type="button"
+              onClick={() => handlers.onRestoreBlacklist?.(opportunity.id)}
+            >
+              <RotateCcw size={16} aria-hidden="true" />恢复机会
+            </button>
+          ) : null}
+          {!blacklistState && handlers.onBlacklist ? (
+            <button
+              className="ghost-button opportunity-button opportunity-button--danger"
+              type="button"
+              onClick={() => handlers.onBlacklist?.(opportunity.id)}
+            >
+              <Ban size={16} aria-hidden="true" />拉黑公司
+            </button>
+          ) : null}
+        </div>
+
+        {handlers.onScheduleFollowUp ? (
+          <details className="opportunity-card__follow-up">
+            <summary><CalendarClock size={16} aria-hidden="true" />安排跟进</summary>
+            <div>
+              <label>
+                <span>跟进时间</span>
+                <input
+                  type="datetime-local"
+                  value={followUpDraft}
+                  onChange={(event) => setFollowUpDraft(event.currentTarget.value)}
+                />
+              </label>
+              <button
+                className="secondary-button opportunity-button"
+                type="button"
+                disabled={!followUpDraft}
+                onClick={() => handlers.onScheduleFollowUp?.(opportunity.id, followUpDraft)}
+              >
+                保存任务
+              </button>
+            </div>
+          </details>
+        ) : null}
+      </section>
     </article>
   );
 }
-
 function csvCell(value: unknown) {
   const raw = value === undefined || value === null ? "" : String(value);
   const text = /^[=+@-]/.test(raw) ? `'${raw}` : raw;
@@ -406,6 +497,7 @@ export function OpportunityCenter({
   handlers,
   title = "机会漏斗",
   description = "把发现、投递、沟通和面试放在同一条清晰路径里。",
+  showBlacklistedByDefault = false,
 }: OpportunityCenterProps) {
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState<StageFilter>("all");
@@ -416,12 +508,37 @@ export function OpportunityCenter({
   const [previewRows, setPreviewRows] = useState<ImportPreviewRow[]>([]);
   const [previewError, setPreviewError] = useState("");
   const [viewName, setViewName] = useState("");
+  const [showBlacklisted, setShowBlacklisted] = useState(showBlacklistedByDefault);
 
   const activeView = savedViews.find((view) => view.id === activeViewId);
   const normalizedSearch = search.trim().toLowerCase();
+  const companyBlacklistStates = useMemo(
+    () => getCompanyBlacklistStates(opportunities),
+    [opportunities],
+  );
+  const blacklistedOpportunities = useMemo(
+    () => opportunities.filter((opportunity) =>
+      companyBlacklistStates.has(createOpportunityCompanyKey(opportunity.job.company))),
+    [companyBlacklistStates, opportunities],
+  );
+  const nonBlacklistedOpportunities = useMemo(
+    () => opportunities.filter((opportunity) =>
+      !companyBlacklistStates.has(createOpportunityCompanyKey(opportunity.job.company))),
+    [companyBlacklistStates, opportunities],
+  );
+  const sourceKeyCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    opportunities.forEach((opportunity) => {
+      const sourceKey = opportunity.sourceKey || createOpportunitySourceKey(opportunity);
+      counts.set(sourceKey, (counts.get(sourceKey) ?? 0) + 1);
+    });
+    return counts;
+  }, [opportunities]);
   const filtered = useMemo(
     () =>
       opportunities.filter((opportunity) => {
+        const matchesBlacklist =
+          showBlacklisted || !companyBlacklistStates.has(createOpportunityCompanyKey(opportunity.job.company));
         const matchesSearch =
           !normalizedSearch ||
           `${opportunity.job.company} ${opportunity.job.title}`.toLowerCase().includes(normalizedSearch);
@@ -432,25 +549,25 @@ export function OpportunityCenter({
           (!activeView.stages?.length || activeView.stages.includes(opportunity.stage)) &&
           (!activeView.source || activeView.source === opportunity.source) &&
           (!activeView.query || `${opportunity.job.company} ${opportunity.job.title}`.toLowerCase().includes(activeView.query.toLowerCase()));
-        return matchesSearch && matchesStage && matchesSource && matchesView;
+        return matchesBlacklist && matchesSearch && matchesStage && matchesSource && matchesView;
       }),
-    [activeView, normalizedSearch, opportunities, sourceFilter, stageFilter],
+    [activeView, companyBlacklistStates, normalizedSearch, opportunities, showBlacklisted, sourceFilter, stageFilter],
   );
 
   const stats = useMemo(() => {
     const counts = Object.fromEntries(
       (Object.keys(STAGE_DEFINITIONS) as OpportunityStage[]).map((stage) => [stage, 0]),
     ) as Record<OpportunityStage, number>;
-    opportunities.forEach((opportunity) => {
+    nonBlacklistedOpportunities.forEach((opportunity) => {
       counts[opportunity.stage] += 1;
     });
     const activeCount = ACTIVE_STAGES.reduce((total, stage) => total + counts[stage], 0);
-    const dueCount = opportunities.filter(
+    const dueCount = nonBlacklistedOpportunities.filter(
       (opportunity) => opportunity.nextAction && !opportunity.nextAction.completedAt && isOverdue(opportunity.nextAction.dueAt),
     ).length;
-    const interviewing = opportunities.filter((opportunity) => opportunity.stage === "interviewing").length;
+    const interviewing = nonBlacklistedOpportunities.filter((opportunity) => opportunity.stage === "interviewing").length;
     return { counts, activeCount, dueCount, interviewing };
-  }, [opportunities]);
+  }, [nonBlacklistedOpportunities]);
 
   function applySavedView(viewId: string) {
     setActiveViewId(viewId);
@@ -525,6 +642,17 @@ export function OpportunityCenter({
             <h3 id="opportunity-list-title">{filtered.length} 条结果</h3>
           </div>
           <div className="opportunity-toolbar-actions">
+            {blacklistedOpportunities.length ? (
+              <button
+                className={`ghost-button opportunity-button ${showBlacklisted ? "is-active" : ""}`}
+                type="button"
+                aria-pressed={showBlacklisted}
+                onClick={() => setShowBlacklisted((current) => !current)}
+              >
+                <Ban size={16} aria-hidden="true" />
+                {showBlacklisted ? "隐藏黑名单" : `显示黑名单 (${blacklistedOpportunities.length})`}
+              </button>
+            ) : null}
             <button
               className="secondary-button opportunity-button"
               type="button"
@@ -626,6 +754,7 @@ export function OpportunityCenter({
             setStageFilter("all");
             setSourceFilter("all");
             setActiveViewId("all");
+            setShowBlacklisted(false);
           }}>
             <RotateCcw size={15} aria-hidden="true" />重置筛选
           </button>
@@ -633,15 +762,37 @@ export function OpportunityCenter({
 
         {filtered.length ? (
           <div className="opportunity-card-list">
-            {filtered.map((opportunity) => (
-              <OpportunityCard key={opportunity.id} opportunity={opportunity} handlers={handlers} />
-            ))}
+            {filtered.map((opportunity) => {
+              const companyKey = createOpportunityCompanyKey(opportunity.job.company);
+              const sourceKey = opportunity.sourceKey || createOpportunitySourceKey(opportunity);
+              return (
+                <OpportunityCard
+                  key={opportunity.id}
+                  opportunity={opportunity}
+                  handlers={handlers}
+                  blacklistState={companyBlacklistStates.get(companyKey)}
+                  duplicateCount={sourceKeyCounts.get(sourceKey) ?? 1}
+                />
+              );
+            })}
           </div>
         ) : (
           <div className="opportunity-empty" role="status">
             <CircleDashed size={32} aria-hidden="true" />
-            <h4>{opportunities.length ? "当前筛选没有结果" : "漏斗还是空的"}</h4>
-            <p>{opportunities.length ? "调整阶段、来源或搜索词，查看其他机会。" : "从下方粘贴岗位或预览 CSV，把第一条机会放进来。"}</p>
+            <h4>
+              {opportunities.length
+                ? blacklistedOpportunities.length && !showBlacklisted
+                  ? `黑名单已隐藏 ${blacklistedOpportunities.length} 条机会`
+                  : "当前筛选没有结果"
+                : "漏斗还是空的"}
+            </h4>
+            <p>
+              {opportunities.length
+                ? blacklistedOpportunities.length && !showBlacklisted
+                  ? "打开“显示黑名单”查看原因并恢复公司机会。"
+                  : "调整阶段、来源或搜索词，查看其他机会。"
+                : "从下方粘贴岗位或预览 CSV，把第一条机会放进来。"}
+            </p>
           </div>
         )}
       </section>
@@ -726,5 +877,3 @@ export function OpportunityCenter({
     </section>
   );
 }
-
-
