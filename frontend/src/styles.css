@@ -72,6 +72,8 @@ button {
   letter-spacing: 0;
 }
 
+.ai-settings-button { white-space: nowrap; }
+
 .topbar-actions {
   display: flex;
   flex-wrap: wrap;

@@ -1635,7 +1635,7 @@ export default function App() {
           </div>
           <div className="topbar-actions">
             <button
-              className="secondary-button"
+              className="secondary-button ai-settings-button"
               type="button"
               aria-label="AI 服务配置"
               onClick={() => openIntegrationSection("settings")}
